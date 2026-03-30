@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Animated Bars + Geometry</title>
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; background: #151515; overflow: hidden; cursor: none; }
+canvas { display: block; width: 100%; height: 100%; }
+
+.noise {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  pointer-events: none;
+  opacity: 0.1;
+  background-image: url("https://static.wixstatic.com/media/a5775f_01b34b9349b64c61a60772c221eee07e~mv2.gif");
+  background-repeat: repeat;
+  background-size: 200px 200px;
+  mix-blend-mode: multiply;
+}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="noise"></div>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const COLOR = '#00e87b';
+const BG = '#151515';
+const dpr = devicePixelRatio;
+
+function resize() {
+  canvas.width = window.innerWidth * dpr;
+  canvas.height = window.innerHeight * dpr;
+}
+resize();
+window.addEventListener('resize', () => { resize(); initTiles(); });
+
+/* ========== TILES STATE ========== */
+let cellSize = 1;
+let cols = 1, rows = 1;
+let tiles = []; // flat array of tile objects
+let mouseCol = -1, mouseRowIdx = -1;
+let mouseOver = false;
+
+function getColCount() {
+  const w = window.innerWidth;
+  if (w < 768) return 11;
+  if (w >= 1920) return 35;
+  return Math.round(((w - 320) / (1920 - 320)) * (35 - 11) + 11);
+}
+
+function randomAngle() {
+  return Math.floor(Math.random() * 4) * Math.PI;
+}
+
+// 4 columns x 4 rows
+const logoPattern = [
+  [0, 1, 0, 1],
+  [1, 0, 1, 0],
+  [1, 0, 1, 0],
+  [1, 0, 0, 1],
+];
+
+function isLogoTile(col, row) {
+  const logoColStart = Math.floor(cols / 2) - 2;
+  const logoRowStart = Math.floor(rows / 2) - 2;
+  const lc = col - logoColStart;
+  const lr = row - logoRowStart;
+  if (lc < 0 || lc > 3 || lr < 0 || lr > 3) return false;
+  return logoPattern[lr][lc] === 1;
+}
+
+// Half-tiles: col 3, row 1 (bottom half) + col 3, row 2 (top half) form a small square
+function getLogoHalf(col, row) {
+  const logoColStart = Math.floor(cols / 2) - 2;
+  const logoRowStart = Math.floor(rows / 2) - 2;
+  const lc = col - logoColStart;
+  const lr = row - logoRowStart;
+  if (lc === 3 && lr === 1) return 'bottom';
+  if (lc === 3 && lr === 2) return 'top';
+  return null;
+}
+
+function initTiles() {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  cols = getColCount();
+  cellSize = w / cols;
+  rows = Math.ceil(h / cellSize);
+
+  tiles = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const logo = isLogoTile(c, r);
+      const half = getLogoHalf(c, r);
+      const angle = (logo || half) ? 0 : randomAngle();
+      tiles.push({
+        col: c,
+        row: r,
+        cx: (c + 0.5) * cellSize,
+        cy: (r + 0.5) * cellSize,
+        angle,
+        targetAngle: angle,
+        isLogo: logo,
+        logoHalf: half,
+        nextChange: performance.now() + 400 + Math.random() * 300,
+      });
+    }
+  }
+}
+initTiles();
+
+function updateTiles(now) {
+  for (const tile of tiles) {
+    if (tile.isLogo || tile.logoHalf) continue;
+    if (mouseOver) {
+      // Snap target to nearest odd multiple of PI (BG side)
+      tile.targetAngle = Math.round(tile.targetAngle / (2 * Math.PI)) * 2 * Math.PI + Math.PI;
+    } else if (now > tile.nextChange) {
+      tile.targetAngle += Math.PI;
+      tile.nextChange = now + 2000 + Math.random() * 3000;
+    }
+    tile.angle += (tile.targetAngle - tile.angle) * 0.08;
+  }
+}
+
+/* ========== MOUSE TRACKING ========== */
+canvas.addEventListener('mousemove', (e) => {
+  mouseOver = true;
+});
+
+canvas.addEventListener('mouseleave', () => {
+  mouseOver = false;
+});
+
+/* ========== RENDER ========== */
+function render(time) {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  const timeSec = time / 1000;
+
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+
+  // --- Draw tiles ---
+  updateTiles(time);
+  for (const tile of tiles) {
+    if (tile.logoHalf) {
+      // Draw half-height green square
+      const top = tile.row * cellSize;
+      const s = cellSize / 2;
+      ctx.fillStyle = COLOR;
+      if (tile.logoHalf === 'bottom') {
+        ctx.fillRect(Math.floor(tile.cx - s / 2), Math.floor(top + cellSize - s / 2), Math.ceil(s), Math.ceil(s / 2));
+      } else {
+        ctx.fillRect(Math.floor(tile.cx - s / 2), Math.floor(top), Math.ceil(s), Math.ceil(s / 2));
+      }
+      continue;
+    }
+    const flip = Math.cos(tile.angle);
+    const visibleWidth = Math.abs(flip) * cellSize;
+    const left = tile.cx - visibleWidth / 2;
+    const top = tile.row * cellSize;
+    ctx.fillStyle = flip >= 0 ? COLOR : BG;
+    ctx.fillRect(Math.floor(left), Math.floor(top), Math.ceil(visibleWidth), Math.ceil(cellSize));
+  }
+
+
+  requestAnimationFrame(render);
+}
+requestAnimationFrame(render);
+</script>
+</body>
+</html>

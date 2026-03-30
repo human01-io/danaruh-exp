@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Animated Bars</title>
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  background: #151515;
+  overflow: hidden;
+}
+
+.hero-pattern {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.hero-pattern_row {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  margin: 0;
+}
+
+.hero-pattern_unit {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: #1100ff;
+  transition: width 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+              left 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+</style>
+</head>
+<body>
+
+<div class="hero-pattern">
+  <div class="hero-pattern_row"></div>
+  <div class="hero-pattern_row"></div>
+</div>
+
+<script>
+const stepSizes = [120, 108, 86, 58, 24, 12, 4];
+
+function getLineCount() {
+  const w = window.innerWidth;
+  if (w < 768) return 11;
+  if (w >= 1920) return 35;
+  return Math.round(((w - 320) / (1920 - 320)) * (35 - 11) + 11);
+}
+
+function randomWidth() {
+  return Math.floor(1 + 119 * Math.pow(Math.random(), 3));
+}
+
+function createUnits(row) {
+  row.innerHTML = '';
+  const count = getLineCount();
+  const rowWidth = row.clientWidth;
+  const cellWidth = rowWidth / count;
+
+  for (let i = 0; i < count; i++) {
+    const center = (i + 0.5) * cellWidth;
+    const w = randomWidth();
+    const unit = document.createElement('div');
+    unit.classList.add('hero-pattern_unit');
+    unit.style.width = w + 'px';
+    unit.style.left = (center - w / 2) + 'px';
+    unit.dataset.index = i;
+    unit.dataset.center = center;
+    row.appendChild(unit);
+    setTimeout(() => scheduleUpdate(unit), 400 + Math.random() * 300);
+  }
+}
+
+function scheduleUpdate(unit) {
+  const row = unit.parentElement;
+  if (!row || row._isHovered) return;
+  const w = randomWidth();
+  const center = parseFloat(unit.dataset.center);
+  unit.style.width = w + 'px';
+  unit.style.left = (center - w / 2) + 'px';
+  unit._timeout = setTimeout(() => scheduleUpdate(unit), 900 + Math.random() * 400);
+}
+
+function applyHover(row, hoveredIndex) {
+  row._isHovered = true;
+  row.querySelectorAll('.hero-pattern_unit').forEach(unit => {
+    clearTimeout(unit._timeout);
+    const idx = parseInt(unit.dataset.index, 10);
+    const center = parseFloat(unit.dataset.center);
+    const dist = Math.abs(idx - hoveredIndex);
+    const w = dist === 0 ? 120 : dist <= 6 ? stepSizes[dist] : 1;
+    unit.style.width = w + 'px';
+    unit.style.left = (center - w / 2) + 'px';
+  });
+}
+
+function restoreRandom(row) {
+  row._isHovered = false;
+  row.querySelectorAll('.hero-pattern_unit').forEach(unit => {
+    clearTimeout(unit._timeout);
+    const w = randomWidth();
+    const center = parseFloat(unit.dataset.center);
+    unit.style.width = w + 'px';
+    unit.style.left = (center - w / 2) + 'px';
+    unit._timeout = setTimeout(() => scheduleUpdate(unit), 900 + Math.random() * 400);
+  });
+}
+
+function initRow(row) {
+  createUnits(row);
+  row.addEventListener('mouseover', (e) => {
+    if (e.target.classList.contains('hero-pattern_unit')) {
+      applyHover(row, parseInt(e.target.dataset.index, 10));
+    }
+  });
+  row.addEventListener('mousemove', (e) => {
+    const unit = e.target.closest('.hero-pattern_unit');
+    if (unit) applyHover(row, parseInt(unit.dataset.index, 10));
+  });
+  row.addEventListener('mouseleave', () => restoreRandom(row));
+}
+
+function init() {
+  document.querySelectorAll('.hero-pattern_row').forEach(initRow);
+}
+
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(init, 300);
+});
+
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "duration": 30,
+  "activeTracks": ["ringShape", "rotX", "rotY"],
+  "keyframes": {
+    "ringShape": [
+      { "time": 0, "value": "circle" },
+      { "time": 9.5, "value": "circle" },
+      { "time": 10.0, "value": "human" },
+      { "time": 19.5, "value": "human" },
+      { "time": 20.0, "value": "svgSilhouette" },
+      { "time": 30, "value": "svgSilhouette" }
+    ],
+    "rotX": [
+      { "time": 0, "value": 1.2217 },
+      { "time": 30, "value": 1.2217 }
+    ],
+    "rotY": [
+      { "time": 0, "value": 0 },
+      { "time": 30, "value": 6.2832 }
+    ]
+  },
+  "state": {
+    "bgColor": [0.1294, 0.1725, 0.1647],
+    "lineColor": [1.0, 0.5333, 0.1020],
+    "ringWidth": 3.9,
+    "meridianWidth": 1.2,
+    "ringAlpha": 1.0,
+    "meridianAlpha": 0.0,
+    "glowIntensity": 0.3,
+    "glowFalloff": 4.7,
+    "flowSpeed": 0.02,
+    "flowDir": -1,
+    "ringCount": 60,
+    "bloomIntensity": 0.0,
+    "chromaticAberration": 0.003,
+    "vignette": 0.0,
+    "grain": 0.1,
+    "flatMode": true,
+    "ringShape": "circle",
+    "shapeRotation": 0,
+    "throatRadius": 1.0,
+    "throatScale": 2.0,
+    "funnelExtent": 0.5,
+    "discWidth": 1.0,
+    "meridians": 48,
+    "particleCount": 0,
+    "rotX": 1.2217,
+    "rotY": 0,
+    "cameraZ": -6
+  }
+}

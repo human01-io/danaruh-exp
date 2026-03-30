@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D Gradient Background</title>
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; background: #222; overflow: hidden; }
+canvas { display: block; width: 100%; height: 100%; }
+
+.grain {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+  opacity: 0.35;
+  mix-blend-mode: overlay;
+}
+.grain svg { width: 100%; height: 100%; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div class="grain">
+  <svg>
+    <filter id="noise">
+      <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="4" stitchTiles="stitch" seed="0"/>
+      <feColorMatrix type="saturate" values="0"/>
+    </filter>
+    <rect width="100%" height="100%" filter="url(#noise)"/>
+  </svg>
+</div>
+
+<script>
+// Animate grain by changing the seed each frame
+const turb = document.querySelector('#noise feTurbulence');
+let grainFrame = 0;
+function animateGrain() {
+  grainFrame++;
+  if (grainFrame % 3 === 0) { // update every 3 frames for perf
+    turb.setAttribute('seed', Math.random() * 100 | 0);
+  }
+  requestAnimationFrame(animateGrain);
+}
+animateGrain();
+</script>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.156.0/build/three.module.js"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+
+const vertexShader = `
+uniform float time;
+uniform vec3 uColor[6];
+uniform vec2 uNoiseScale;
+uniform float uNoiseBump;
+uniform float uNoiseFlow;
+uniform float uNoiseSpeed;
+uniform float uNoiseSeed;
+uniform vec2 uNoiseFq;
+uniform float uNoiseFqScale;
+uniform float uNoiseFloor;
+uniform float uNoiseCeil;
+uniform float uNoiseCeilFactor;
+
+varying vec2 vUv;
+varying vec3 vColor;
+
+vec4 permute(vec4 x){ return mod(((x*34.0)+1.0)*x, 289.0); }
+vec4 taylorInvSqrt(vec4 r){ return 1.79284291400159 - 0.85373472095314 * r; }
+
+float snoise(vec3 v){
+  const vec2 C = vec2(1.0/6.0, 1.0/3.0);
+  const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);
+
+  vec3 i  = floor(v + dot(v, C.yyy));
+  vec3 x0 = v - i + dot(i, C.xxx);
+
+  vec3 g = step(x0.yzx, x0.xyz);
+  vec3 l = 1.0 - g;
+  vec3 i1 = min(g.xyz, l.zxy);
+  vec3 i2 = max(g.xyz, l.zxy);
+
+  vec3 x1 = x0 - i1 + C.xxx;
+  vec3 x2 = x0 - i2 + 2.0 * C.xxx;
+  vec3 x3 = x0 - 1.0 + 3.0 * C.xxx;
+
+  i = mod(i, 289.0);
+  vec4 p = permute(permute(permute(
+              i.z + vec4(0.0, i1.z, i2.z, 1.0))
+            + i.y + vec4(0.0, i1.y, i2.y, 1.0))
+            + i.x + vec4(0.0, i1.x, i2.x, 1.0));
+
+  float n_ = 1.0/7.0;
+  vec3 ns = n_ * D.wyz - D.xzx;
+
+  vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
+
+  vec4 x_ = floor(j * ns.z);
+  vec4 y_ = floor(j - 7.0 * x_);
+
+  vec4 x = x_ * ns.x + ns.yyyy;
+  vec4 y = y_ * ns.x + ns.yyyy;
+  vec4 h = 1.0 - abs(x) - abs(y);
+
+  vec4 b0 = vec4(x.xy, y.xy);
+  vec4 b1 = vec4(x.zw, y.zw);
+
+  vec4 s0 = floor(b0) * 2.0 + 1.0;
+  vec4 s1 = floor(b1) * 2.0 + 1.0;
+  vec4 sh = -step(h, vec4(0.0));
+
+  vec4 a0 = b0.xzyw + s0.xzyw * sh.xxyy;
+  vec4 a1 = b1.xzyw + s1.xzyw * sh.zzww;
+
+  vec3 p0 = vec3(a0.xy, h.x);
+  vec3 p1 = vec3(a0.zw, h.y);
+  vec3 p2 = vec3(a1.xy, h.z);
+  vec3 p3 = vec3(a1.zw, h.w);
+
+  vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2,p2), dot(p3,p3)));
+  p0 *= norm.x;
+  p1 *= norm.y;
+  p2 *= norm.z;
+  p3 *= norm.w;
+
+  vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
+  m = m * m;
+  return 42.0 * dot(m*m, vec4(dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3)));
+}
+
+float random(vec2 c){
+  return fract(sin(dot(c.xy, vec2(12.9898, 78.233))) * 43758.5453);
+}
+
+void main() {
+  vec2 noiseCoords = uv * uNoiseScale;
+  float rand = random(uv);
+
+  float noise = snoise(vec3(noiseCoords.x + time * 30.0, noiseCoords.y, time * 20.0));
+  vec3 pos = vec3(position.x, position.y, position.z + noise * uNoiseBump);
+
+  vColor = uColor[0];
+
+  for(int i = 1; i < 6; i++) {
+    float noiseFlow  = uNoiseFlow + float(i) * 0.5;
+    float noiseSpeed = uNoiseSpeed + float(i) * 0.5;
+    float noiseSeed  = 1.0 + float(i) * uNoiseSeed;
+    vec2  noiseFreq  = uNoiseFq * uNoiseFqScale;
+
+    float noiseFloor = uNoiseFloor;
+    float noiseCeil  = uNoiseCeil + float(i) * uNoiseCeilFactor;
+
+    float noise = snoise(vec3(
+      noiseCoords.x * noiseFreq.x + time * noiseFlow,
+      noiseCoords.y * noiseFreq.y,
+      time * noiseSpeed + noiseSeed
+    ));
+    float finalNoise = smoothstep(noiseFloor, noiseCeil, noise);
+    vColor = mix(vColor, uColor[i], finalNoise);
+  }
+
+  vUv = uv;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+}
+`;
+
+const fragmentShader = `
+uniform float time;
+uniform float uMixNoise;
+
+varying vec2 vUv;
+varying vec3 vColor;
+
+float random(vec2 c){
+  return fract(sin(dot(c.xy, vec2(12.9898, 78.233))) * 43758.5453);
+}
+
+void main() {
+  float rand = random(vUv);
+  vec3 finalColor = vColor;
+  finalColor.rgb += mix(-uMixNoise, uMixNoise, rand);
+  gl_FragColor = vec4(finalColor, 1.0);
+}
+`;
+
+// --- Colors from masaigon.space ---
+const palette = {
+  black:    '#222222',
+  hopeful:  '#ff5b5b',
+  grateful: '#60cbbe',
+  proud:    '#ad45ff',
+  loved:    '#ff8bd1',
+  sad:      '#6d93dd',
+  worried:  '#4bb055',
+};
+
+function hexToColor(hex) {
+  return new THREE.Color(hex);
+}
+
+// Active color set: black base, 3 accent colors interleaved with black
+const colors = [
+  hexToColor(palette.black),
+  hexToColor(palette.loved),
+  hexToColor(palette.black),
+  hexToColor(palette.hopeful),
+  hexToColor(palette.black),
+  hexToColor(palette.sad),
+];
+
+// --- Scene setup ---
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setSize(window.innerWidth, window.innerHeight);
+
+const aspect = window.innerWidth / window.innerHeight;
+const scale = window.innerWidth < 1024 ? 1 : 0.5;
+const camera = new THREE.OrthographicCamera(
+  scale * aspect / -2, scale * aspect / 2,
+  scale * aspect / 2,  scale * aspect / -2,
+  -1000, 1000
+);
+
+const scene = new THREE.Scene();
+
+const segments = window.innerWidth < 1024 ? 64 : 128;
+const geometry = new THREE.PlaneGeometry(1.5, 1.5, segments, segments);
+
+const material = new THREE.ShaderMaterial({
+  uniforms: {
+    time:              { value: 0 },
+    uColor:            { value: colors },
+    uNoiseScale:       { value: new THREE.Vector2(2.5, 4) },
+    uNoiseBump:        { value: 0.25 },
+    uNoiseFlow:        { value: 15 },
+    uNoiseSpeed:       { value: 0 },
+    uNoiseSeed:        { value: 25 },
+    uNoiseFq:          { value: new THREE.Vector2(0.75, 1) },
+    uNoiseFqScale:     { value: 0.5 },
+    uNoiseFloor:       { value: 0.1 },
+    uNoiseCeil:        { value: 0.75 },
+    uNoiseCeilFactor:  { value: 0.07 },
+    uMixNoise:         { value: 0.02 },
+  },
+  vertexShader,
+  fragmentShader,
+});
+
+const mesh = new THREE.Mesh(geometry, material);
+mesh.rotation.x = -0.5;
+mesh.rotation.y = 0.5;
+scene.add(mesh);
+
+// --- Resize ---
+window.addEventListener('resize', () => {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  renderer.setSize(w, h);
+  const a = w / h;
+  const s = w < 1024 ? 1 : 0.5;
+  camera.left   = s * a / -2;
+  camera.right  = s * a / 2;
+  camera.top    = s * a / 2;
+  camera.bottom = s * a / -2;
+  camera.updateProjectionMatrix();
+});
+
+// --- Presets ---
+const presets = {
+  'default': {
+    noiseScaleX: 2.5, noiseScaleY: 4, noiseBump: 0.25, noiseFlow: 15,
+    noiseSpeed: 0, noiseSeed: 25, noiseFqX: 0.75, noiseFqY: 1,
+    noiseFqScale: 0.5, noiseFloor: 0.1, noiseCeil: 0.75, noiseCeilFactor: 0.07,
+    mixNoise: 0.02, rotX: -0.5, rotY: 0.5,
+    grainOpacity: 0.35, grainFreq: 0.85,
+    base: '#222222', color1: '#ff8bd1', color2: '#ff5b5b', color3: '#6d93dd',
+  },
+  'green bars': {
+    noiseScaleX: 17.7, noiseScaleY: 0, noiseBump: 0, noiseFlow: 15,
+    noiseSpeed: 87.6, noiseSeed: 75.1, noiseFqX: 0.51, noiseFqY: 0.27,
+    noiseFqScale: 0.65, noiseFloor: 0.29, noiseCeil: 0.75, noiseCeilFactor: 0.103,
+    mixNoise: 0.1, rotX: 0.14, rotY: 0.5,
+    grainOpacity: 1, grainFreq: 0.86,
+    base: '#282828', color1: '#69ff34', color2: '#55ffa3', color3: '#5cef59',
+  },
+};
+
+function applyPreset(name) {
+  const p = presets[name];
+  if (!p) return;
+  const u = material.uniforms;
+  u.uNoiseScale.value.set(p.noiseScaleX, p.noiseScaleY);
+  u.uNoiseBump.value = p.noiseBump;
+  u.uNoiseFlow.value = p.noiseFlow;
+  u.uNoiseSpeed.value = p.noiseSpeed;
+  u.uNoiseSeed.value = p.noiseSeed;
+  u.uNoiseFq.value.set(p.noiseFqX, p.noiseFqY);
+  u.uNoiseFqScale.value = p.noiseFqScale;
+  u.uNoiseFloor.value = p.noiseFloor;
+  u.uNoiseCeil.value = p.noiseCeil;
+  u.uNoiseCeilFactor.value = p.noiseCeilFactor;
+  u.uMixNoise.value = p.mixNoise;
+  mesh.rotation.x = p.rotX;
+  mesh.rotation.y = p.rotY;
+
+  // Colors
+  const base = hexToColor(p.base);
+  u.uColor.value[0] = base;
+  u.uColor.value[1] = hexToColor(p.color1);
+  u.uColor.value[2] = base.clone();
+  u.uColor.value[3] = hexToColor(p.color2);
+  u.uColor.value[4] = base.clone();
+  u.uColor.value[5] = hexToColor(p.color3);
+
+  // Grain
+  const grainEl = document.querySelector('.grain');
+  const turbEl = document.querySelector('#noise feTurbulence');
+  if (grainEl) grainEl.style.opacity = p.grainOpacity;
+  if (turbEl) turbEl.setAttribute('baseFrequency', p.grainFreq);
+}
+
+// --- dat.gui ---
+const guiScript = document.createElement('script');
+guiScript.src = 'https://cdn.jsdelivr.net/npm/dat.gui@0.7.9/build/dat.gui.min.js';
+guiScript.onload = () => {
+  const gui = new dat.GUI({ width: 320 });
+
+  // Presets folder
+  const presetNames = Object.keys(presets);
+  const presetState = { current: 'default' };
+  const pf = gui.addFolder('Presets');
+  pf.add(presetState, 'current', presetNames).name('load preset').onChange(name => {
+    applyPreset(name);
+    // Update local tracking vars & refresh all controllers
+    const p = presets[name];
+    grainParams.opacity = p.grainOpacity;
+    grainParams.frequency = p.grainFreq;
+    colorState.base = p.base;
+    colorState.color1 = p.color1;
+    colorState.color2 = p.color2;
+    colorState.color3 = p.color3;
+    for (const key in gui.__folders) {
+      gui.__folders[key].__controllers.forEach(c => c.updateDisplay());
+    }
+  });
+  pf.open();
+
+  const f = gui.addFolder('Background');
+  f.add(material.uniforms.uNoiseScale.value, 'x', 0, 20, 0.1).name('noise scale x');
+  f.add(material.uniforms.uNoiseScale.value, 'y', 0, 20, 0.1).name('noise scale y');
+  f.add(material.uniforms.uNoiseBump, 'value', 0, 0.5, 0.01).name('noise bump');
+  f.add(material.uniforms.uNoiseFlow, 'value', 0, 100, 0.1).name('noise flow');
+  f.add(material.uniforms.uNoiseSpeed, 'value', 0, 100, 0.1).name('noise speed');
+  f.add(material.uniforms.uNoiseSeed, 'value', 0, 100, 0.1).name('noise seed');
+  f.add(material.uniforms.uNoiseFq.value, 'x', 0, 2, 0.01).name('noise fq x');
+  f.add(material.uniforms.uNoiseFq.value, 'y', 0, 2, 0.01).name('noise fq y');
+  f.add(material.uniforms.uNoiseFqScale, 'value', 0, 1, 0.01).name('noise fq scale');
+  f.add(material.uniforms.uNoiseFloor, 'value', 0, 1, 0.01).name('noise floor');
+  f.add(material.uniforms.uNoiseCeil, 'value', 0, 1, 0.01).name('noise ceil');
+  f.add(material.uniforms.uNoiseCeilFactor, 'value', 0, 1, 0.001).name('noise ceil factor');
+  f.add(material.uniforms.uMixNoise, 'value', 0, 0.1, 0.001).name('mix noise');
+  f.add(mesh.rotation, 'x', -Math.PI * 0.5, Math.PI * 0.5, 0.01).name('plane rotation x');
+  f.add(mesh.rotation, 'y', -Math.PI * 0.5, Math.PI * 0.5, 0.01).name('plane rotation y');
+
+  // Grain overlay controls
+  const grainParams = { opacity: 0.35, frequency: 0.85 };
+  const grainEl = document.querySelector('.grain');
+  const turbEl = document.querySelector('#noise feTurbulence');
+  const g = gui.addFolder('Grain Overlay');
+  g.add(grainParams, 'opacity', 0, 1, 0.01).name('grain opacity').onChange(v => {
+    grainEl.style.opacity = v;
+  });
+  g.add(grainParams, 'frequency', 0.1, 3, 0.01).name('grain size').onChange(v => {
+    turbEl.setAttribute('baseFrequency', v);
+  });
+
+  // Color controls — full hex pickers + base color
+  const colorFolder = gui.addFolder('Colors');
+  const colorState = {
+    base: '#222222',
+    color1: '#ff8bd1',
+    color2: '#ff5b5b',
+    color3: '#6d93dd',
+  };
+
+  colorFolder.addColor(colorState, 'base').name('base (dark)').onChange(v => {
+    const c = hexToColor(v);
+    material.uniforms.uColor.value[0] = c;
+    material.uniforms.uColor.value[2] = c.clone();
+    material.uniforms.uColor.value[4] = c.clone();
+  });
+  colorFolder.addColor(colorState, 'color1').name('color 1').onChange(v => {
+    material.uniforms.uColor.value[1] = hexToColor(v);
+  });
+  colorFolder.addColor(colorState, 'color2').name('color 2').onChange(v => {
+    material.uniforms.uColor.value[3] = hexToColor(v);
+  });
+  colorFolder.addColor(colorState, 'color3').name('color 3').onChange(v => {
+    material.uniforms.uColor.value[5] = hexToColor(v);
+  });
+
+  f.open();
+};
+document.head.appendChild(guiScript);
+
+// --- Animate ---
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+  material.uniforms.time.value = clock.getElapsedTime() * 0.005;
+  renderer.render(scene, camera);
+}
+animate();
+</script>
+</body>
+</html>

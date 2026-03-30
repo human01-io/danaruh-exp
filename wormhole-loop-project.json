@@ -1,0 +1,91 @@
+{
+  "version": 1,
+  "duration": 5,
+  "ease": "power2.inOut",
+  "loopMode": "yoyo",
+  "activeTracks": [
+    "ringShape",
+    "rotX",
+    "rotY",
+    "funnelExtent",
+    "throatScale",
+    "shapeRotation",
+    "cameraZ"
+  ],
+  "keyframes": {
+    "ringShape": [
+      { "time": 0, "value": "svgSilhouette" },
+      { "time": 1.55, "value": "svgSilhouette" },
+      { "time": 2.15, "value": "human" },
+      { "time": 2.95, "value": "human" },
+      { "time": 3.45, "value": "circle" },
+      { "time": 5, "value": "circle" }
+    ],
+    "rotX": [
+      { "time": 0, "value": -1.5533 },
+      { "time": 1.6, "value": -1.554 },
+      { "time": 2.4, "value": -0.6133 },
+      { "time": 5, "value": -0.6133 }
+    ],
+    "rotY": [
+      { "time": 0, "value": -3.15 },
+      { "time": 1.6, "value": -2.7 },
+      { "time": 2.4, "value": -3.145 },
+      { "time": 5, "value": -3.145 }
+    ],
+    "funnelExtent": [
+      { "time": 0, "value": 0.5 },
+      { "time": 1.7, "value": 0.5 },
+      { "time": 2.3, "value": 0.9 },
+      { "time": 3.0, "value": 0.9 },
+      { "time": 3.5, "value": 0.5 },
+      { "time": 5, "value": 0.5 }
+    ],
+    "throatScale": [
+      { "time": 0, "value": 2 },
+      { "time": 2.0, "value": 2 },
+      { "time": 3.5, "value": 1.1 },
+      { "time": 4.1, "value": 2 },
+      { "time": 5, "value": 2 }
+    ],
+    "shapeRotation": [
+      { "time": 0, "value": 0 },
+      { "time": 1.2, "value": 0 },
+      { "time": 4.2, "value": 4.712 },
+      { "time": 5, "value": 4.712 }
+    ],
+    "cameraZ": [
+      { "time": 0, "value": -4.11 },
+      { "time": 5, "value": -4.11 }
+    ]
+  },
+  "state": {
+    "rotX": -1.5533,
+    "rotY": -3.15,
+    "cameraZ": -4.11,
+    "bgColor": [0.1294, 0.1725, 0.1647],
+    "lineColor": [1, 0.5333, 0.102],
+    "ringWidth": 3.9,
+    "meridianWidth": 1.2,
+    "ringAlpha": 1,
+    "meridianAlpha": 0,
+    "glowIntensity": 0.3,
+    "glowFalloff": 4.7,
+    "flowSpeed": 0.02,
+    "flowDir": -1,
+    "ringCount": 60,
+    "bloomIntensity": 0,
+    "chromaticAberration": 0.003,
+    "vignette": 0,
+    "grain": 0.1,
+    "flatMode": true,
+    "ringShape": "svgSilhouette",
+    "shapeRotation": 0,
+    "throatRadius": 1,
+    "throatScale": 2,
+    "funnelExtent": 0.5,
+    "discWidth": 1,
+    "meridians": 48,
+    "particleCount": 0
+  }
+}

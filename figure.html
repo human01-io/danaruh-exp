@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Anthropomorphic Figure</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #f5f2ee;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    overflow: hidden;
+  }
+  svg {
+    width: min(90vw, 600px);
+    height: auto;
+  }
+</style>
+</head>
+<body>
+
+<svg viewBox="0 0 560 900" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="gPink" cx="50%" cy="25%" r="65%">
+      <stop offset="0%" stop-color="#ff66dd"/>
+      <stop offset="100%" stop-color="#ee1177"/>
+    </radialGradient>
+    <radialGradient id="gOrange" cx="50%" cy="25%" r="65%">
+      <stop offset="0%" stop-color="#ffbb33"/>
+      <stop offset="100%" stop-color="#ff5500"/>
+    </radialGradient>
+    <radialGradient id="gPink2" cx="50%" cy="25%" r="65%">
+      <stop offset="0%" stop-color="#ff66dd"/>
+      <stop offset="100%" stop-color="#ee1177"/>
+    </radialGradient>
+    <radialGradient id="gOrange2" cx="50%" cy="25%" r="65%">
+      <stop offset="0%" stop-color="#ffbb33"/>
+      <stop offset="100%" stop-color="#ff5500"/>
+    </radialGradient>
+  </defs>
+
+  <g id="figure">
+
+    <!-- ============ CROWN (wide, 3 teeth with gaps) ============ -->
+    <g id="crown">
+      <rect x="185" y="15" width="38" height="60" fill="#1a1a1a"/>
+      <rect x="241" y="15" width="38" height="60" fill="#1a1a1a"/>
+      <rect x="297" y="15" width="38" height="60" fill="#1a1a1a"/>
+      <!-- Horizontal crossbar -->
+      <rect x="170" y="58" width="180" height="38" fill="#1a1a1a"/>
+    </g>
+
+    <!-- ============ TORSO (4 pieces: 2 distinct shapes, each mirrored) ============ -->
+    <g id="torso">
+      <!-- Piece A (smaller bubble) — LEFT -->
+      <ellipse id="torsoAL" cx="218" cy="165" rx="42" ry="80" fill="#1a1a1a"
+               stroke="#f5f2ee" stroke-width="1.2"
+               transform="rotate(20, 218, 165)"/>
+      <!-- Piece A (smaller bubble) — RIGHT (mirrored) -->
+      <ellipse id="torsoAR" cx="302" cy="165" rx="42" ry="80" fill="#1a1a1a"
+               stroke="#f5f2ee" stroke-width="1.2"
+               transform="rotate(-20, 302, 165)"/>
+
+      <!-- Piece B (bigger/longer bubble) — LEFT -->
+      <ellipse id="torsoBL" cx="238" cy="220" rx="38" ry="110" fill="#1a1a1a"
+               stroke="#f5f2ee" stroke-width="1.2"
+               transform="rotate(10, 238, 220)"/>
+      <!-- Piece B (bigger/longer bubble) — RIGHT (mirrored) -->
+      <ellipse id="torsoBR" cx="282" cy="220" rx="38" ry="110" fill="#1a1a1a"
+               stroke="#f5f2ee" stroke-width="1.2"
+               transform="rotate(-10, 282, 220)"/>
+    </g>
+
+    <!-- ============ GRADIENT ORBS (head/neck area) ============ -->
+    <circle id="orbPinkHead" cx="260" cy="130" r="26" fill="url(#gPink)"/>
+    <circle id="orbOrangeHead" cx="260" cy="182" r="26" fill="url(#gOrange)"/>
+
+    <!-- ============ BODY CIRCLES (cluster filling torso) ============ -->
+    <g id="bodyCircles">
+      <!-- Central large -->
+      <circle cx="258" cy="238" r="34" fill="#1a1a1a" stroke="#555" stroke-width="1"/>
+      <!-- Upper flanking -->
+      <circle cx="218" cy="218" r="22" fill="#1a1a1a" stroke="#555" stroke-width="1"/>
+      <circle cx="298" cy="218" r="22" fill="#1a1a1a" stroke="#555" stroke-width="1"/>
+      <!-- Mid flanking -->
+      <circle cx="206" cy="258" r="18" fill="#1a1a1a" stroke="#555" stroke-width="1"/>
+      <circle cx="310" cy="258" r="18" fill="#1a1a1a" stroke="#555" stroke-width="1"/>
+      <!-- Lower cluster -->
+      <circle cx="232" cy="282" r="18" fill="#1a1a1a" stroke="#555" stroke-width="1"/>
+      <circle cx="284" cy="282" r="18" fill="#1a1a1a" stroke="#555" stroke-width="1"/>
+      <!-- Central bottom -->
+      <circle cx="258" cy="308" r="22" fill="#1a1a1a" stroke="#555" stroke-width="1"/>
+      <!-- Spine -->
+      <circle cx="255" cy="345" r="20" fill="#1a1a1a" stroke="#555" stroke-width="1"/>
+      <circle cx="252" cy="378" r="18" fill="#1a1a1a" stroke="#555" stroke-width="1"/>
+    </g>
+
+    <!-- ============ LEFT ARM (bent outward, attached to shoulder) ============ -->
+    <g id="armL">
+      <!-- Upper arm from shoulder -->
+      <rect x="148" y="195" width="48" height="14" rx="3" fill="#1a1a1a"
+            transform="rotate(45, 172, 202)"/>
+      <!-- Forearm angled down -->
+      <rect x="95" y="248" width="45" height="14" rx="3" fill="#1a1a1a"
+            transform="rotate(-30, 117, 255)"/>
+      <!-- Fist (small square) -->
+      <rect x="90" y="270" width="16" height="18" rx="2" fill="#1a1a1a"/>
+    </g>
+
+    <!-- ============ RIGHT ARM (bent outward, attached to shoulder) ============ -->
+    <g id="armR">
+      <!-- Upper arm from shoulder -->
+      <rect x="324" y="195" width="48" height="14" rx="3" fill="#1a1a1a"
+            transform="rotate(-45, 348, 202)"/>
+      <!-- Forearm angled down -->
+      <rect x="380" y="248" width="45" height="14" rx="3" fill="#1a1a1a"
+            transform="rotate(30, 402, 255)"/>
+      <!-- Fist (small square) -->
+      <rect x="414" y="270" width="16" height="18" rx="2" fill="#1a1a1a"/>
+    </g>
+
+    <!-- ============ LEFT LEG (slightly bent, chain of circles) ============ -->
+    <g id="legL">
+      <circle cx="245" cy="415" r="22" fill="#1a1a1a"/>
+      <circle cx="238" cy="458" r="20" fill="#1a1a1a"/>
+      <circle cx="232" cy="498" r="19" fill="#1a1a1a"/>
+      <circle cx="226" cy="536" r="18" fill="#1a1a1a"/>
+      <circle cx="220" cy="572" r="17" fill="#1a1a1a"/>
+      <!-- Gradient orbs near ankle -->
+      <circle id="orbPinkKnee" cx="215" cy="612" r="24" fill="url(#gPink2)"/>
+      <circle id="orbOrangeKnee" cx="212" cy="658" r="24" fill="url(#gOrange2)"/>
+    </g>
+
+    <!-- ============ RIGHT LEG (angled outward, chain) ============ -->
+    <g id="legR">
+      <circle cx="272" cy="415" r="22" fill="#1a1a1a"/>
+      <circle cx="288" cy="455" r="20" fill="#1a1a1a"/>
+      <circle cx="304" cy="492" r="19" fill="#1a1a1a"/>
+      <circle cx="318" cy="526" r="18" fill="#1a1a1a"/>
+      <circle cx="330" cy="558" r="17" fill="#1a1a1a"/>
+      <circle cx="340" cy="588" r="16" fill="#1a1a1a"/>
+      <circle cx="348" cy="616" r="15" fill="#1a1a1a"/>
+      <circle cx="354" cy="642" r="14" fill="#1a1a1a"/>
+      <!-- Small pink accent -->
+      <circle cx="358" cy="665" r="12" fill="#cc2266"/>
+    </g>
+
+    <!-- ============ LEFT FOOT (L-shaped boot) ============ -->
+    <g id="footL">
+      <rect x="190" y="688" width="35" height="42" fill="#1a1a1a"/>
+      <rect x="170" y="714" width="30" height="16" fill="#1a1a1a"/>
+      <rect x="170" y="722" width="55" height="10" fill="#1a1a1a"/>
+    </g>
+
+    <!-- ============ RIGHT FOOT (L-shaped boot, mirrored) ============ -->
+    <g id="footR">
+      <rect x="340" y="678" width="35" height="42" fill="#1a1a1a"/>
+      <rect x="365" y="704" width="30" height="16" fill="#1a1a1a"/>
+      <rect x="340" y="712" width="55" height="10" fill="#1a1a1a"/>
+    </g>
+
+  </g>
+</svg>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script>
+  gsap.defaults({ ease: "sine.inOut" });
+
+  // Gentle body sway
+  gsap.to("#figure", {
+    rotation: 1.2,
+    transformOrigin: "260px 400px",
+    duration: 3,
+    repeat: -1,
+    yoyo: true
+  });
+
+  // Crown bob
+  gsap.to("#crown", {
+    y: -5,
+    duration: 2,
+    repeat: -1,
+    yoyo: true
+  });
+
+  // Gradient orbs pulse
+  ["#orbPinkHead", "#orbOrangeHead", "#orbPinkKnee", "#orbOrangeKnee"].forEach((id, i) => {
+    gsap.to(id, {
+      scale: 1.15,
+      transformOrigin: "center",
+      duration: 1.2 + i * 0.2,
+      repeat: -1,
+      yoyo: true,
+      delay: i * 0.25
+    });
+  });
+
+  // Gradient color shifting
+  function shiftGrad(gId, c1, c2) {
+    const stops = document.querySelectorAll(`#${gId} stop`);
+    if (!stops.length) return;
+    gsap.to(stops[0], { attr: { "stop-color": c1 }, duration: 2.5, repeat: -1, yoyo: true, ease: "sine.inOut" });
+    gsap.to(stops[1], { attr: { "stop-color": c2 }, duration: 2.5, repeat: -1, yoyo: true, ease: "sine.inOut" });
+  }
+  shiftGrad("gPink", "#ff88ff", "#ff3399");
+  shiftGrad("gOrange", "#ffdd44", "#ff3300");
+  shiftGrad("gPink2", "#ff88ff", "#ff3399");
+  shiftGrad("gOrange2", "#ffdd44", "#ff3300");
+
+  // Arms swing
+  gsap.to("#armL", { rotation: 5, transformOrigin: "170px 200px", duration: 2.2, repeat: -1, yoyo: true });
+  gsap.to("#armR", { rotation: -5, transformOrigin: "350px 200px", duration: 2.2, repeat: -1, yoyo: true, delay: 0.5 });
+
+  // Legs sway
+  gsap.to("#legL", { x: -2, y: 2, duration: 2.5, repeat: -1, yoyo: true });
+  gsap.to("#legR", { x: 2, y: -2, duration: 2.5, repeat: -1, yoyo: true, delay: 0.5 });
+
+  // Feet
+  gsap.to("#footL", { rotation: -3, transformOrigin: "210px 688px", duration: 1.8, repeat: -1, yoyo: true });
+  gsap.to("#footR", { rotation: 3, transformOrigin: "355px 678px", duration: 1.8, repeat: -1, yoyo: true, delay: 0.4 });
+
+  // Body circles breathing
+  document.querySelectorAll("#bodyCircles circle").forEach((c, i) => {
+    gsap.to(c, {
+      scale: gsap.utils.random(0.95, 1.05),
+      transformOrigin: "center",
+      duration: gsap.utils.random(1.5, 2.5),
+      repeat: -1, yoyo: true,
+      delay: i * 0.1
+    });
+  });
+</script>
+
+</body>
+</html>

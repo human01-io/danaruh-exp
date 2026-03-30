@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Animated Bars + Geometry</title>
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; background: #151515; overflow: hidden; cursor: none; }
+canvas { display: block; width: 100%; height: 100%; }
+
+.noise {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  pointer-events: none;
+  opacity: 0.1;
+  background-image: url("https://static.wixstatic.com/media/a5775f_01b34b9349b64c61a60772c221eee07e~mv2.gif");
+  background-repeat: repeat;
+  background-size: 200px 200px;
+  mix-blend-mode: multiply;
+}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="noise"></div>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const COLOR = '#00e87b';
+const BG = '#151515';
+const dpr = devicePixelRatio;
+
+function resize() {
+  canvas.width = window.innerWidth * dpr;
+  canvas.height = window.innerHeight * dpr;
+}
+resize();
+window.addEventListener('resize', () => { resize(); initBars(); });
+
+/* ========== BARS STATE ========== */
+const stepSizes = [120, 108, 86, 58, 24, 12, 4];
+let barRows = [[], []]; // two rows of bar objects
+let mouseRow = -1, mouseIndex = -1;
+
+function getLineCount() {
+  const w = window.innerWidth;
+  if (w < 768) return 11;
+  if (w >= 1920) return 35;
+  return Math.round(((w - 320) / (1920 - 320)) * (35 - 11) + 11);
+}
+
+function randomWidth() {
+  return Math.floor(1 + 119 * Math.pow(Math.random(), 3));
+}
+
+function initBars() {
+  const count = getLineCount();
+  const w = window.innerWidth;
+  const cellWidth = w / count;
+
+  barRows = [[], []];
+  for (let r = 0; r < 2; r++) {
+    for (let i = 0; i < count; i++) {
+      const center = (i + 0.5) * cellWidth;
+      const bw = randomWidth();
+      barRows[r].push({
+        center,
+        width: bw,
+        targetWidth: bw,
+        index: i,
+        nextChange: performance.now() + 400 + Math.random() * 300,
+        hovered: false,
+      });
+    }
+  }
+}
+initBars();
+
+function updateBars(now) {
+  for (let r = 0; r < 2; r++) {
+    const isHovered = mouseRow === r;
+    for (const bar of barRows[r]) {
+      if (isHovered) {
+        const dist = Math.abs(bar.index - mouseIndex);
+        bar.targetWidth = dist === 0 ? 120 : dist <= 6 ? stepSizes[dist] : 1;
+      } else if (now > bar.nextChange) {
+        bar.targetWidth = randomWidth();
+        bar.nextChange = now + 900 + Math.random() * 400;
+      }
+      // Smooth lerp toward target
+      bar.width += (bar.targetWidth - bar.width) * 0.08;
+    }
+  }
+}
+
+/* ========== MOUSE TRACKING ========== */
+canvas.addEventListener('mousemove', (e) => {
+  const h = window.innerHeight;
+  const row = e.clientY < h / 2 ? 0 : 1;
+  mouseRow = row;
+  // Find closest bar
+  const bars = barRows[row];
+  let closest = 0, minDist = Infinity;
+  for (let i = 0; i < bars.length; i++) {
+    const d = Math.abs(e.clientX - bars[i].center);
+    if (d < minDist) { minDist = d; closest = i; }
+  }
+  mouseIndex = closest;
+});
+
+canvas.addEventListener('mouseleave', () => {
+  mouseRow = -1;
+  mouseIndex = -1;
+});
+
+/* ========== TOUCH + AUTO-SWEEP (mobile) ========== */
+const isMobile = 'ontouchstart' in window;
+
+canvas.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  const h = window.innerHeight;
+  const row = e.touches[0].clientY < h / 2 ? 0 : 1;
+  mouseRow = row;
+  const x = e.touches[0].clientX;
+  const bars = barRows[row];
+  let closest = 0, minDist = Infinity;
+  for (let i = 0; i < bars.length; i++) {
+    const d = Math.abs(x - bars[i].center);
+    if (d < minDist) { minDist = d; closest = i; }
+  }
+  mouseIndex = closest;
+}, { passive: false });
+
+canvas.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  const h = window.innerHeight;
+  const row = e.touches[0].clientY < h / 2 ? 0 : 1;
+  mouseRow = row;
+  const x = e.touches[0].clientX;
+  const bars = barRows[row];
+  let closest = 0, minDist = Infinity;
+  for (let i = 0; i < bars.length; i++) {
+    const d = Math.abs(x - bars[i].center);
+    if (d < minDist) { minDist = d; closest = i; }
+  }
+  mouseIndex = closest;
+}, { passive: false });
+
+canvas.addEventListener('touchend', () => {
+  mouseRow = -1;
+  mouseIndex = -1;
+});
+
+
+/* ========== GEOMETRY CONFIG ========== */
+const squareLayers = [
+  { bpm: 0.4,  dir: 1,  phase: 0 },
+  { bpm: 0.6,  dir: -1, phase: 1.2 },
+  { bpm: 0.35, dir: 1,  phase: 2.8 },
+];
+
+function getSquareAngle(cfg, timeSec) {
+  const beat = timeSec * cfg.bpm + cfg.phase;
+  const beatFrac = beat - Math.floor(beat);
+  const hold = 0.55;
+  let ease;
+  if (beatFrac < hold) {
+    ease = 0;
+  } else {
+    const t = (beatFrac - hold) / (1 - hold);
+    ease = t * t * (3 - 2 * t);
+  }
+  const idx = Math.floor(beat);
+  return cfg.dir * (Math.PI / 2) * (idx + ease);
+}
+
+/* ========== LOGO ========== */
+const logoPattern = [
+  [0, 1, 0, 1],
+  [1, 0, 1, 0],
+  [1, 0, 1, 0],
+  [1, 0, 0, 1],
+];
+function drawLogo(cx, cy, size, color) {
+  const cell = size / 4;
+  const ox = cx - size / 2;
+  const oy = cy - size / 2;
+  ctx.fillStyle = color;
+  for (let r = 0; r < 4; r++) {
+    for (let c = 0; c < 4; c++) {
+      if (logoPattern[r][c]) {
+          const x1 = Math.round(ox + c * cell);
+          const y1 = Math.round(oy + r * cell);
+          const x2 = Math.round(ox + (c + 1) * cell);
+          const y2 = Math.round(oy + (r + 1) * cell);
+          ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
+        }
+    }
+  }
+  // Half-size square between rows 1-2, col 3
+  const hs = cell / 2;
+  ctx.fillRect(ox + 3 * cell + cell / 2 - hs / 2, oy + 2 * cell - hs / 2, hs, hs);
+}
+
+/* ========== RENDER ========== */
+function render(time) {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  const timeSec = time / 1000;
+
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+
+  // --- Draw bars ---
+  updateBars(time);
+  ctx.fillStyle = COLOR;
+  for (let r = 0; r < 2; r++) {
+    const rowTop = r === 0 ? 0 : h / 2;
+    const rowBottom = r === 0 ? h / 2 : h;
+    for (const bar of barRows[r]) {
+      const left = bar.center - bar.width / 2;
+      ctx.fillRect(left, rowTop, bar.width, rowBottom - rowTop);
+    }
+  }
+
+  // --- Draw geometry with XOR compositing ---
+  // This inverts colors: green on black = green, green on green = black
+  ctx.globalCompositeOperation = 'xor';
+
+  const cx = w / 2;
+  const cy = h / 2;
+  const outerSize = Math.min(w, h) * 0.6;
+
+  for (let i = 0; i < squareLayers.length; i++) {
+    const s = outerSize / Math.pow(Math.SQRT2, i);
+    const angle = getSquareAngle(squareLayers[i], timeSec);
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(angle);
+    ctx.fillStyle = COLOR;
+    ctx.fillRect(-s / 2, -s / 2, s, s);
+    ctx.restore();
+  }
+
+  // --- Draw logo at center with XOR ---
+  drawLogo(cx, cy, Math.min(w, h) * 0.25, COLOR);
+
+  ctx.globalCompositeOperation = 'source-over';
+
+  requestAnimationFrame(render);
+}
+requestAnimationFrame(render);
+</script>
+</body>
+</html>

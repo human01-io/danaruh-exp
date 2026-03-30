@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bars — 3D Orbit Reveal</title>
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; background: #151515; overflow: hidden; cursor: none; }
+canvas { display: block; width: 100%; height: 100%; }
+
+.grain {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+  opacity: 0.15;
+  mix-blend-mode: multiply;
+}
+.grain svg { width: 100%; height: 100%; }
+
+.hint {
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  color: #fcd23a;
+  font-family: monospace;
+  font-size: 13px;
+  pointer-events: none;
+  animation: pulse 2s ease-in-out infinite;
+  transition: opacity 0.5s;
+}
+@keyframes pulse { 0%,100% { opacity: 0.3; } 50% { opacity: 0.7; } }
+</style>
+</head>
+<body>
+
+<div class="grain">
+  <svg>
+    <filter id="grainFilter">
+      <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="4" stitchTiles="stitch" seed="0"/>
+      <feColorMatrix type="saturate" values="0"/>
+    </filter>
+    <rect width="100%" height="100%" filter="url(#grainFilter)"/>
+  </svg>
+</div>
+
+<div class="hint">scroll to orbit</div>
+
+<script>
+const grainTurb = document.querySelector('#grainFilter feTurbulence');
+let gf = 0;
+function animateGrain() {
+  gf++;
+  if (gf % 3 === 0) grainTurb.setAttribute('seed', Math.random() * 100 | 0);
+  requestAnimationFrame(animateGrain);
+}
+animateGrain();
+</script>
+
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.156.0/build/three.module.js" } }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+/* ========== GLSL NOISE ========== */
+const noiseGLSL = `
+vec4 permute(vec4 x){ return mod(((x*34.0)+1.0)*x, 289.0); }
+vec4 taylorInvSqrt(vec4 r){ return 1.79284291400159 - 0.85373472095314 * r; }
+float snoise(vec3 v){
+  const vec2 C = vec2(1.0/6.0, 1.0/3.0);
+  const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);
+  vec3 i = floor(v + dot(v, C.yyy));
+  vec3 x0 = v - i + dot(i, C.xxx);
+  vec3 g = step(x0.yzx, x0.xyz);
+  vec3 l = 1.0 - g;
+  vec3 i1 = min(g.xyz, l.zxy);
+  vec3 i2 = max(g.xyz, l.zxy);
+  vec3 x1 = x0 - i1 + C.xxx;
+  vec3 x2 = x0 - i2 + 2.0 * C.xxx;
+  vec3 x3 = x0 - 1.0 + 3.0 * C.xxx;
+  i = mod(i, 289.0);
+  vec4 p = permute(permute(permute(
+    i.z + vec4(0.0, i1.z, i2.z, 1.0))
+    + i.y + vec4(0.0, i1.y, i2.y, 1.0))
+    + i.x + vec4(0.0, i1.x, i2.x, 1.0));
+  float n_ = 1.0/7.0;
+  vec3 ns = n_ * D.wyz - D.xzx;
+  vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
+  vec4 x_ = floor(j * ns.z);
+  vec4 y_ = floor(j - 7.0 * x_);
+  vec4 x = x_ * ns.x + ns.yyyy;
+  vec4 y = y_ * ns.x + ns.yyyy;
+  vec4 h = 1.0 - abs(x) - abs(y);
+  vec4 b0 = vec4(x.xy, y.xy);
+  vec4 b1 = vec4(x.zw, y.zw);
+  vec4 s0 = floor(b0) * 2.0 + 1.0;
+  vec4 s1 = floor(b1) * 2.0 + 1.0;
+  vec4 sh = -step(h, vec4(0.0));
+  vec4 a0 = b0.xzyw + s0.xzyw * sh.xxyy;
+  vec4 a1 = b1.xzyw + s1.xzyw * sh.zzww;
+  vec3 p0 = vec3(a0.xy, h.x);
+  vec3 p1 = vec3(a0.zw, h.y);
+  vec3 p2 = vec3(a1.xy, h.z);
+  vec3 p3 = vec3(a1.zw, h.w);
+  vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2,p2), dot(p3,p3)));
+  p0 *= norm.x; p1 *= norm.y; p2 *= norm.z; p3 *= norm.w;
+  vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
+  m = m * m;
+  return 42.0 * dot(m*m, vec4(dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3)));
+}
+`;
+
+/* ========== SHADERS ========== */
+const barVert = `
+${noiseGLSL}
+uniform float time;
+uniform vec3 uColor1;
+uniform vec3 uColor2;
+uniform vec3 uColor3;
+uniform float uColorSpeed;
+varying vec3 vColor;
+varying vec3 vWorldPos;
+varying vec3 vNormal;
+
+void main() {
+  vec4 wp = modelMatrix * vec4(position, 1.0);
+  vWorldPos = wp.xyz;
+  vNormal = normalize(normalMatrix * normal);
+
+  float n1 = snoise(vec3(wp.x * 0.3, wp.y * 0.1, time * uColorSpeed)) * 0.5 + 0.5;
+  float n2 = snoise(vec3(wp.x * 0.2 + 10.0, wp.z * 0.5, time * uColorSpeed * 0.7 + 5.0)) * 0.5 + 0.5;
+  vec3 c = mix(uColor1, uColor2, n1);
+  c = mix(c, uColor3, n2 * 0.4);
+  vColor = c;
+
+  gl_Position = projectionMatrix * viewMatrix * wp;
+}`;
+
+const barFrag = `
+varying vec3 vColor;
+varying vec3 vWorldPos;
+varying vec3 vNormal;
+uniform float uMixNoise;
+
+float random(vec2 c){ return fract(sin(dot(c, vec2(12.9898,78.233))) * 43758.5453); }
+
+void main() {
+  // Subtle directional light
+  vec3 light = normalize(vec3(0.3, 0.6, 1.0));
+  float diff = dot(vNormal, light) * 0.15 + 0.85;
+  vec3 color = vColor * diff;
+
+  // Dithering
+  color += mix(-uMixNoise, uMixNoise, random(gl_FragCoord.xy));
+
+  gl_FragColor = vec4(color, 1.0);
+}`;
+
+const shapeVert = `
+${noiseGLSL}
+uniform float time;
+uniform vec3 uColor1;
+uniform vec3 uColor2;
+uniform float uWobble;
+varying vec3 vColor;
+varying vec3 vNormal;
+
+void main() {
+  vec3 pos = position;
+  float n = snoise(vec3(normal * 1.5 + time * 0.8));
+  pos += normal * n * uWobble;
+
+  vec4 wp = modelMatrix * vec4(pos, 1.0);
+  float nc = snoise(vec3(wp.xyz * 0.3 + time * 0.25)) * 0.5 + 0.5;
+  vColor = mix(uColor1, uColor2, nc);
+  vNormal = normalize(normalMatrix * normal);
+
+  gl_Position = projectionMatrix * viewMatrix * wp;
+}`;
+
+const shapeFrag = `
+varying vec3 vColor;
+varying vec3 vNormal;
+
+void main() {
+  vec3 light = normalize(vec3(0.4, 0.8, 0.6));
+  float diff = dot(vNormal, light) * 0.25 + 0.75;
+  gl_FragColor = vec4(vColor * diff, 1.0);
+}`;
+
+/* ========== JS SIMPLEX NOISE ========== */
+const F3=1/3,G3=1/6;
+const grad3=[[1,1,0],[-1,1,0],[1,-1,0],[-1,-1,0],[1,0,1],[-1,0,1],[1,0,-1],[-1,0,-1],[0,1,1],[0,-1,1],[0,1,-1],[0,-1,-1]];
+const pm=new Uint8Array(512),pm12=new Uint8Array(512);
+{const p=new Uint8Array(256);for(let i=0;i<256;i++)p[i]=i;for(let i=255;i>0;i--){const j=Math.floor(Math.random()*(i+1));[p[i],p[j]]=[p[j],p[i]];}for(let i=0;i<512;i++){pm[i]=p[i&255];pm12[i]=pm[i]%12;}}
+function sn3(x,y,z){const s=(x+y+z)*F3;const i=Math.floor(x+s),j=Math.floor(y+s),k=Math.floor(z+s);const t=(i+j+k)*G3;const x0=x-(i-t),y0=y-(j-t),z0=z-(k-t);let i1,j1,k1,i2,j2,k2;if(x0>=y0){if(y0>=z0){i1=1;j1=0;k1=0;i2=1;j2=1;k2=0}else if(x0>=z0){i1=1;j1=0;k1=0;i2=1;j2=0;k2=1}else{i1=0;j1=0;k1=1;i2=1;j2=0;k2=1}}else{if(y0<z0){i1=0;j1=0;k1=1;i2=0;j2=1;k2=1}else if(x0<z0){i1=0;j1=1;k1=0;i2=0;j2=1;k2=1}else{i1=0;j1=1;k1=0;i2=1;j2=1;k2=0}}const x1=x0-i1+G3,y1=y0-j1+G3,z1=z0-k1+G3,x2=x0-i2+2*G3,y2=y0-j2+2*G3,z2=z0-k2+2*G3,x3=x0-1+3*G3,y3=y0-1+3*G3,z3=z0-1+3*G3;const ii=i&255,jj=j&255,kk=k&255;function c(gi,cx,cy,cz){let t0=.6-cx*cx-cy*cy-cz*cz;if(t0<0)return 0;t0*=t0;const g=grad3[gi];return t0*t0*(g[0]*cx+g[1]*cy+g[2]*cz)}return 32*(c(pm12[ii+pm[jj+pm[kk]]],x0,y0,z0)+c(pm12[ii+i1+pm[jj+j1+pm[kk+k1]]],x1,y1,z1)+c(pm12[ii+i2+pm[jj+j2+pm[kk+k2]]],x2,y2,z2)+c(pm12[ii+1+pm[jj+1+pm[kk+1]]],x3,y3,z3))}
+
+/* ========== SETUP ========== */
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setClearColor(0x151515);
+document.body.prepend(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
+
+/* ========== PARAMS ========== */
+const params = {
+  color1: '#fcd23a',
+  color2: '#ffa028',
+  color3: '#ff6432',
+  colorSpeed: 0.3,
+  mixNoise: 0.02,
+  barDepth: 0.4,
+  shapeWobble: 0.12,
+  shapeDepth: 0.8,
+  orbitRadius: 12,
+  orbitHeight: 3,
+  scrollSpeed: 0.0015,
+  autoRotate: 0.05,
+  mouseInfluence: 0.15,
+};
+
+/* ========== MATERIALS ========== */
+const barMat = new THREE.ShaderMaterial({
+  uniforms: {
+    time: { value: 0 },
+    uColor1: { value: new THREE.Color(params.color1) },
+    uColor2: { value: new THREE.Color(params.color2) },
+    uColor3: { value: new THREE.Color(params.color3) },
+    uColorSpeed: { value: params.colorSpeed },
+    uMixNoise: { value: params.mixNoise },
+  },
+  vertexShader: barVert,
+  fragmentShader: barFrag,
+  side: THREE.DoubleSide,
+});
+
+const shapeMat = new THREE.ShaderMaterial({
+  uniforms: {
+    time: { value: 0 },
+    uColor1: { value: new THREE.Color(params.color1) },
+    uColor2: { value: new THREE.Color(params.color2) },
+    uWobble: { value: params.shapeWobble },
+  },
+  vertexShader: shapeVert,
+  fragmentShader: shapeFrag,
+  side: THREE.DoubleSide,
+});
+
+/* ========== BUILD BARS ========== */
+// Bars arranged like the 2D version — vertical columns spread across X
+const barCount = 28;
+const spread = 14; // total width
+const barGeo = new THREE.BoxGeometry(1, 1, 1);
+const barMeshes = [];
+
+for (let i = 0; i < barCount; i++) {
+  const x = (i / (barCount - 1) - 0.5) * spread;
+  const n = sn3(i * 0.4, 0, 0);
+  const t = n * 0.5 + 0.5;
+  const width = 0.08 + 0.5 * t;
+  const height = 9;
+
+  const mesh = new THREE.Mesh(barGeo, barMat);
+  mesh.scale.set(width, height, params.barDepth);
+  mesh.position.set(x, 0, 0);
+  mesh.userData = { index: i, baseX: x };
+  scene.add(mesh);
+  barMeshes.push(mesh);
+}
+
+/* ========== BUILD SHAPES ========== */
+// Circle → Torus
+const torus = new THREE.Mesh(
+  new THREE.TorusGeometry(2.2, 0.12, 32, 64),
+  shapeMat
+);
+torus.position.set(0, 0, params.shapeDepth);
+scene.add(torus);
+
+// 4 cubes (chamfered boxes) around center
+const cubeGeo = new THREE.BoxGeometry(1.6, 1.6, 1.6, 4, 4, 4);
+const cubePositions = [
+  { gx: -1, gy: -1 }, { gx: 1, gy: -1 },
+  { gx: -1, gy: 1 },  { gx: 1, gy: 1 },
+];
+const cubeMeshes = [];
+const cubeOffset = 2.4;
+
+for (const cp of cubePositions) {
+  const cube = new THREE.Mesh(cubeGeo, shapeMat);
+  cube.position.set(
+    cp.gx * cubeOffset,
+    cp.gy * cubeOffset,
+    params.shapeDepth * 0.5
+  );
+  cube.rotation.set(0.3, 0.5, 0);
+  cube.userData = { gx: cp.gx, gy: cp.gy };
+  scene.add(cube);
+  cubeMeshes.push(cube);
+}
+
+// Logo — extruded blocks
+const logoGroup = new THREE.Group();
+const logoPattern = [
+  [0,1,0,1],
+  [1,0,1,0],
+  [1,0,1,0],
+  [1,0,0,1],
+];
+const cellSize = 0.55;
+const logoBlockGeo = new THREE.BoxGeometry(cellSize * 0.9, cellSize * 0.9, 0.5);
+
+for (let r = 0; r < 4; r++) {
+  for (let c = 0; c < 4; c++) {
+    if (logoPattern[r][c]) {
+      const block = new THREE.Mesh(logoBlockGeo, shapeMat);
+      block.position.set(
+        (c - 1.5) * cellSize,
+        (1.5 - r) * cellSize,
+        0
+      );
+      logoGroup.add(block);
+    }
+  }
+}
+// Small half-block
+const hb = new THREE.Mesh(
+  new THREE.BoxGeometry(cellSize * 0.4, cellSize * 0.4, 0.5),
+  shapeMat
+);
+hb.position.set(1.5 * cellSize, 0, 0);
+logoGroup.add(hb);
+
+logoGroup.position.set(0, 0, params.shapeDepth * 1.2);
+scene.add(logoGroup);
+
+/* ========== ORBIT CAMERA ========== */
+let orbitAngle = 0;        // horizontal angle (radians)
+let targetOrbitAngle = 0;
+let orbitPitch = 0;         // vertical tilt
+let targetOrbitPitch = 0;
+let mouseX = 0, mouseY = 0;
+
+// Scroll drives orbit
+window.addEventListener('wheel', (e) => {
+  targetOrbitAngle += e.deltaY * params.scrollSpeed;
+  const hint = document.querySelector('.hint');
+  if (hint) hint.style.opacity = '0';
+}, { passive: true });
+
+// Touch
+let touchStartX = 0, touchStartY = 0;
+window.addEventListener('touchstart', (e) => {
+  touchStartX = e.touches[0].clientX;
+  touchStartY = e.touches[0].clientY;
+});
+window.addEventListener('touchmove', (e) => {
+  const dx = e.touches[0].clientX - touchStartX;
+  const dy = e.touches[0].clientY - touchStartY;
+  touchStartX = e.touches[0].clientX;
+  touchStartY = e.touches[0].clientY;
+  targetOrbitAngle -= dx * 0.005;
+  targetOrbitPitch += dy * 0.003;
+  targetOrbitPitch = Math.max(-0.5, Math.min(0.5, targetOrbitPitch));
+}, { passive: true });
+
+// Mouse for subtle look offset
+window.addEventListener('mousemove', (e) => {
+  mouseX = (e.clientX / window.innerWidth - 0.5) * 2;
+  mouseY = (e.clientY / window.innerHeight - 0.5) * 2;
+});
+
+/* ========== RESIZE ========== */
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+/* ========== ANIMATE ========== */
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const time = clock.getElapsedTime();
+
+  // Auto-rotate + scroll orbit
+  targetOrbitAngle += params.autoRotate * 0.001;
+  orbitAngle += (targetOrbitAngle - orbitAngle) * 0.04;
+  orbitPitch += (targetOrbitPitch - orbitPitch) * 0.04;
+
+  // Camera orbits around center
+  const R = params.orbitRadius;
+  const H = params.orbitHeight;
+  const camX = Math.sin(orbitAngle) * R;
+  const camZ = Math.cos(orbitAngle) * R;
+  const camY = Math.sin(orbitPitch) * H;
+
+  // Add mouse offset
+  camera.position.set(
+    camX + mouseX * params.mouseInfluence,
+    camY + mouseY * params.mouseInfluence * -1,
+    camZ
+  );
+  camera.lookAt(0, 0, params.shapeDepth * 0.5);
+
+  // Update uniforms
+  barMat.uniforms.time.value = time;
+  barMat.uniforms.uColorSpeed.value = params.colorSpeed;
+  barMat.uniforms.uMixNoise.value = params.mixNoise;
+  shapeMat.uniforms.time.value = time;
+  shapeMat.uniforms.uWobble.value = params.shapeWobble;
+
+  // Animate bar widths
+  for (const bar of barMeshes) {
+    const n = sn3(bar.userData.index * 0.4, time * 0.15, 0);
+    const t = n * 0.5 + 0.5;
+    const w = 0.08 + 0.5 * t;
+    bar.scale.x += (w - bar.scale.x) * 0.05;
+    bar.scale.z = params.barDepth;
+  }
+
+  // Animate torus wobble via rotation
+  torus.rotation.x = Math.sin(time * 0.3) * 0.15;
+  torus.rotation.y = time * 0.1;
+
+  // Cubes: beat-drift + slow rotation
+  for (const cube of cubeMeshes) {
+    const beat = time * 0.5 + cube.userData.gx * 1.2 + cube.userData.gy * 0.8;
+    const frac = beat - Math.floor(beat);
+    const hold = 0.6;
+    let snap = 0;
+    if (frac >= hold) {
+      const tt = (frac - hold) / (1 - hold);
+      snap = tt * tt * (3 - 2 * tt);
+    }
+    const idx = Math.floor(beat);
+    const drift = (idx % 2 === 0 ? snap : 1 - snap) * 0.3;
+    cube.position.x = cube.userData.gx * cubeOffset * (1 - drift * 0.15);
+    cube.position.y = cube.userData.gy * cubeOffset * (1 - drift * 0.15);
+
+    cube.rotation.x += 0.003;
+    cube.rotation.y += 0.004;
+  }
+
+  // Logo: gentle sway
+  logoGroup.rotation.y = Math.sin(time * 0.15) * 0.2;
+  logoGroup.rotation.x = Math.sin(time * 0.1 + 1) * 0.1;
+
+  renderer.render(scene, camera);
+}
+animate();
+
+/* ========== DAT.GUI ========== */
+const guiScript = document.createElement('script');
+guiScript.src = 'https://cdn.jsdelivr.net/npm/dat.gui@0.7.9/build/dat.gui.min.js';
+guiScript.onload = () => {
+  const gui = new dat.GUI({ width: 300 });
+
+  function updateColors() {
+    barMat.uniforms.uColor1.value.set(params.color1);
+    barMat.uniforms.uColor2.value.set(params.color2);
+    barMat.uniforms.uColor3.value.set(params.color3);
+    shapeMat.uniforms.uColor1.value.set(params.color1);
+    shapeMat.uniforms.uColor2.value.set(params.color2);
+  }
+
+  const fc = gui.addFolder('Colors');
+  fc.addColor(params, 'color1').name('color 1').onChange(updateColors);
+  fc.addColor(params, 'color2').name('color 2').onChange(updateColors);
+  fc.addColor(params, 'color3').name('color 3').onChange(updateColors);
+  fc.add(params, 'colorSpeed', 0, 2, 0.01).name('color speed');
+  fc.add(params, 'mixNoise', 0, 0.1, 0.001).name('dithering');
+  fc.open();
+
+  const fo = gui.addFolder('Orbit');
+  fo.add(params, 'orbitRadius', 4, 25, 0.5).name('distance');
+  fo.add(params, 'orbitHeight', 0, 10, 0.5).name('height range');
+  fo.add(params, 'scrollSpeed', 0.0005, 0.01, 0.0005).name('scroll speed');
+  fo.add(params, 'autoRotate', 0, 0.5, 0.01).name('auto rotate');
+  fo.add(params, 'mouseInfluence', 0, 1, 0.01).name('mouse look');
+
+  const fb = gui.addFolder('Bars');
+  fo.add(params, 'barDepth', 0.1, 3, 0.05).name('bar depth');
+
+  const fs = gui.addFolder('Shapes');
+  fs.add(params, 'shapeWobble', 0, 0.5, 0.01).name('wobble');
+  fs.add(params, 'shapeDepth', 0, 3, 0.1).name('layer depth').onChange(v => {
+    torus.position.z = v;
+    logoGroup.position.z = v * 1.2;
+    for (const c of cubeMeshes) c.position.z = v * 0.5;
+  });
+
+  const fg = gui.addFolder('Grain');
+  const grainEl = document.querySelector('.grain');
+  const turbEl = document.querySelector('#grainFilter feTurbulence');
+  fg.add({ opacity: 0.15 }, 'opacity', 0, 1, 0.01).name('opacity').onChange(v => grainEl.style.opacity = v);
+  fg.add({ freq: 0.8 }, 'freq', 0.1, 3, 0.01).name('grain size').onChange(v => turbEl.setAttribute('baseFrequency', v));
+};
+document.head.appendChild(guiScript);
+</script>
+</body>
+</html>

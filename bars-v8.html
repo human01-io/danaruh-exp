@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vertical Bars + Isometric Hexagon</title>
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; background: #151515; overflow: hidden; cursor: none; }
+canvas { display: block; width: 100%; height: 100%; }
+.noise {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  pointer-events: none;
+  opacity: 0.18;
+  background-image: url("https://static.wixstatic.com/media/a5775f_01b34b9349b64c61a60772c221eee07e~mv2.gif");
+  background-repeat: repeat;
+  background-size: 200px 200px;
+  mix-blend-mode: multiply;
+}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="noise"></div>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const COLOR = '#171aff';
+const dpr = devicePixelRatio;
+
+function resize() {
+  canvas.width = window.innerWidth * dpr;
+  canvas.height = window.innerHeight * dpr;
+}
+resize();
+window.addEventListener('resize', () => { resize(); initBars(); });
+
+/* ========== VERTICAL BARS ========== */
+const stepSizes = [120, 108, 86, 58, 24, 12, 4];
+let bars = [];
+let mouseIndex = -1;
+let mouseActive = false;
+
+function getLineCount() {
+  const w = window.innerWidth;
+  if (w < 768) return 11;
+  if (w >= 1920) return 35;
+  return Math.round(((w - 320) / (1920 - 320)) * (35 - 11) + 11);
+}
+
+function randomWidth() {
+  return Math.floor(1 + 119 * Math.pow(Math.random(), 3));
+}
+
+function initBars() {
+  const count = getLineCount();
+  const w = window.innerWidth;
+  const cellWidth = w / count;
+
+  bars = [];
+  for (let i = 0; i < count; i++) {
+    const center = (i + 0.5) * cellWidth;
+    const bw = randomWidth();
+    bars.push({
+      center,
+      width: bw,
+      targetWidth: bw,
+      index: i,
+      nextChange: performance.now() + 400 + Math.random() * 300,
+    });
+  }
+}
+initBars();
+
+function updateBars(now) {
+  for (const bar of bars) {
+    if (mouseActive) {
+      const dist = Math.abs(bar.index - mouseIndex);
+      bar.targetWidth = dist === 0 ? 120 : dist <= 6 ? stepSizes[dist] : 1;
+    } else if (now > bar.nextChange) {
+      bar.targetWidth = randomWidth();
+      bar.nextChange = now + 900 + Math.random() * 400;
+    }
+    bar.width += (bar.targetWidth - bar.width) * 0.08;
+  }
+}
+
+/* ========== MOUSE TRACKING ========== */
+canvas.addEventListener('mousemove', (e) => {
+  mouseActive = true;
+  let closest = 0, minDist = Infinity;
+  for (let i = 0; i < bars.length; i++) {
+    const d = Math.abs(e.clientX - bars[i].center);
+    if (d < minDist) { minDist = d; closest = i; }
+  }
+  mouseIndex = closest;
+});
+
+canvas.addEventListener('mouseleave', () => {
+  mouseActive = false;
+  mouseIndex = -1;
+});
+
+/* ========== TOUCH + AUTO-SWEEP (mobile) ========== */
+const isMobile = 'ontouchstart' in window;
+
+canvas.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  mouseActive = true;
+  const x = e.touches[0].clientX;
+  let closest = 0, minDist = Infinity;
+  for (let i = 0; i < bars.length; i++) {
+    const d = Math.abs(x - bars[i].center);
+    if (d < minDist) { minDist = d; closest = i; }
+  }
+  mouseIndex = closest;
+}, { passive: false });
+
+canvas.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  const x = e.touches[0].clientX;
+  let closest = 0, minDist = Infinity;
+  for (let i = 0; i < bars.length; i++) {
+    const d = Math.abs(x - bars[i].center);
+    if (d < minDist) { minDist = d; closest = i; }
+  }
+  mouseIndex = closest;
+}, { passive: false });
+
+canvas.addEventListener('touchend', () => {
+  mouseActive = false;
+  mouseIndex = -1;
+});
+
+
+/* ========== LOGO ========== */
+const logoPattern = [
+  [0, 1, 0, 1],
+  [1, 0, 1, 0],
+  [1, 0, 1, 0],
+  [1, 0, 0, 1],
+];
+function drawLogo(cx, cy, size, color) {
+  const cell = size / 4;
+  const ox = cx - size / 2;
+  const oy = cy - size / 2;
+  ctx.fillStyle = color;
+  for (let r = 0; r < 4; r++) {
+    for (let c = 0; c < 4; c++) {
+      if (logoPattern[r][c]) {
+          const x1 = Math.round(ox + c * cell);
+          const y1 = Math.round(oy + r * cell);
+          const x2 = Math.round(ox + (c + 1) * cell);
+          const y2 = Math.round(oy + (r + 1) * cell);
+          ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
+        }
+    }
+  }
+  const hs = cell / 2;
+  ctx.fillRect(ox + 3 * cell + cell / 2 - hs / 2, oy + 2 * cell - hs / 2, hs, hs);
+}
+
+/* ========== RENDER ========== */
+function render(time) {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  const timeSec = time / 1000;
+
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+
+  const cx = w / 2;
+  const cy = h / 2;
+  const minDim = Math.min(w, h);
+
+  // --- Draw vertical bars ---
+  updateBars(time);
+  ctx.fillStyle = COLOR;
+  for (const bar of bars) {
+    const left = bar.center - bar.width / 2;
+    ctx.fillRect(left, 0, bar.width, h);
+  }
+
+  // --- Draw isometric cube/hexagon made of diamond tiles with XOR ---
+  ctx.globalCompositeOperation = 'xor';
+  ctx.fillStyle = COLOR;
+
+  // Single diamond in center — 10% of screen
+  const tileScale = Math.min(minDim * 1.0098, w * 0.855);
+  const tileW = tileScale;
+  const tileH = tileScale * (0.918 * 0.6 / 1.122);
+
+  function drawDiamond(x, y, tw, th) {
+    ctx.beginPath();
+    ctx.moveTo(x, y - th / 2);
+    ctx.lineTo(x + tw / 2, y);
+    ctx.lineTo(x, y + th / 2);
+    ctx.lineTo(x - tw / 2, y);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  const diamondOffsets = [-0.315, 0, 0.315];
+
+  // Diamond movement at 64 BPM offset
+  const bps = 64 / 60;
+  const dBeat = timeSec * bps + 0.5;
+  const dBeatIndex = Math.floor(dBeat);
+  const dBeatFrac = dBeat - dBeatIndex;
+  const dEase = dBeatFrac < 0.1 ? 0 : Math.pow((dBeatFrac - 0.1) / 0.9, 0.4);
+
+  function hash(a, b) {
+    const n = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
+    return n - Math.floor(n);
+  }
+
+  for (let i = 0; i < 3; i++) {
+    const curDir = (hash(i, dBeatIndex) - 0.5) * 2;
+    const curMag = 0.3 + hash(i + 10, dBeatIndex) * 0.7;
+    const prevDir = (hash(i, dBeatIndex - 1) - 0.5) * 2;
+    const prevMag = 0.3 + hash(i + 10, dBeatIndex - 1) * 0.7;
+
+    const prev = prevDir * prevMag;
+    const cur = curDir * curMag;
+    const drift = tileH * 0.10 * (prev + (cur - prev) * dEase);
+
+    const baseY = cy + diamondOffsets[i] * tileH;
+    drawDiamond(cx, baseY + drift, tileW, tileH);
+  }
+
+  // --- Draw logo at center with XOR ---
+  drawLogo(cx, cy, minDim * 0.25, COLOR);
+
+  ctx.globalCompositeOperation = 'source-over';
+
+  requestAnimationFrame(render);
+}
+requestAnimationFrame(render);
+</script>
+</body>
+</html>

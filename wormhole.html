@@ -1,0 +1,1252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wormhole</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { overflow: hidden; background: #f0f0f0; }
+  canvas { display: block; width: 100vw; height: 100vh; cursor: grab; }
+  canvas:active { cursor: grabbing; }
+
+  #controls {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    width: 260px;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 11px;
+    color: #333;
+    z-index: 10;
+  }
+
+  #toggle {
+    background: rgba(255,255,255,0.85);
+    backdrop-filter: blur(8px);
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 6px 12px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 11px;
+    color: #333;
+    float: right;
+  }
+  #toggle:hover { background: rgba(255,255,255,1); }
+
+  #panel {
+    clear: both;
+    margin-top: 36px;
+    background: rgba(255,255,255,0.88);
+    backdrop-filter: blur(12px);
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    padding: 16px;
+    display: none;
+    max-height: calc(100vh - 80px);
+    overflow-y: auto;
+  }
+  #panel.open { display: block; }
+
+  .group {
+    margin-bottom: 14px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #e5e5e5;
+  }
+  .group:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+
+  .group-title {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: #999;
+    margin-bottom: 8px;
+  }
+
+  .row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  .row:last-child { margin-bottom: 0; }
+
+  .row label {
+    flex-shrink: 0;
+    margin-right: 8px;
+  }
+
+  .row input[type="range"] {
+    flex: 1;
+    height: 4px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: #ddd;
+    border-radius: 2px;
+    outline: none;
+  }
+  .row input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #555;
+    cursor: pointer;
+  }
+
+  .row input[type="color"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 28px;
+    height: 20px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    padding: 0;
+    cursor: pointer;
+    background: none;
+  }
+  .row input[type="color"]::-webkit-color-swatch-wrapper { padding: 1px; }
+  .row input[type="color"]::-webkit-color-swatch { border: none; border-radius: 2px; }
+
+  .val {
+    width: 32px;
+    text-align: right;
+    color: #888;
+    font-size: 10px;
+    flex-shrink: 0;
+    margin-left: 6px;
+  }
+
+  .row select {
+    background: #f5f5f5;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    padding: 2px 4px;
+    font-family: inherit;
+    font-size: 11px;
+    color: #333;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script src="body_slices.js"></script>
+
+<div id="controls">
+  <button id="toggle">Controls</button>
+  <div id="panel">
+
+    <div class="group">
+      <div class="group-title">Colors</div>
+      <div class="row">
+        <label>Background</label>
+        <input type="color" id="bgColor" value="#f0f0f0">
+      </div>
+      <div class="row">
+        <label>Line color</label>
+        <input type="color" id="lineColor" value="#32323a">
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-title">Lines</div>
+      <div class="row">
+        <label>Ring thickness</label>
+        <input type="range" id="ringWidth" min="0.3" max="4" step="0.1" value="1">
+        <span class="val" id="ringWidthVal">1.0</span>
+      </div>
+      <div class="row">
+        <label>Meridian thickness</label>
+        <input type="range" id="meridianWidth" min="0.3" max="4" step="0.1" value="0.8">
+        <span class="val" id="meridianWidthVal">0.8</span>
+      </div>
+      <div class="row">
+        <label>Meridian opacity</label>
+        <input type="range" id="meridianOpacity" min="0" max="1" step="0.05" value="0.25">
+        <span class="val" id="meridianOpacityVal">0.25</span>
+      </div>
+      <div class="row">
+        <label>Ring opacity</label>
+        <input type="range" id="ringOpacity" min="0.1" max="1" step="0.05" value="0.7">
+        <span class="val" id="ringOpacityVal">0.70</span>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-title">Flow</div>
+      <div class="row">
+        <label>Speed</label>
+        <input type="range" id="flowSpeed" min="0" max="0.001" step="0.00001" value="0.00015">
+        <span class="val" id="flowSpeedVal">0.15</span>
+      </div>
+      <div class="row">
+        <label>Direction</label>
+        <select id="flowDir">
+          <option value="1">Top → Bottom</option>
+          <option value="-1">Bottom → Top</option>
+        </select>
+      </div>
+      <div class="row">
+        <label>Ring count</label>
+        <input type="range" id="ringCount" min="6" max="60" step="1" value="28">
+        <span class="val" id="ringCountVal">28</span>
+      </div>
+      <div class="row">
+        <label>Orientation</label>
+        <select id="orientation">
+          <option value="portrait">Portrait</option>
+          <option value="landscape">Landscape</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-title">Mouths</div>
+      <div class="row">
+        <label>Top X</label>
+        <input type="range" id="topX" min="-2" max="2" step="0.05" value="0">
+        <span class="val" id="topXVal">0.00</span>
+      </div>
+      <div class="row">
+        <label>Top Z</label>
+        <input type="range" id="topZ" min="-2" max="2" step="0.05" value="0">
+        <span class="val" id="topZVal">0.00</span>
+      </div>
+      <div class="row">
+        <label>Bottom X</label>
+        <input type="range" id="botX" min="-2" max="2" step="0.05" value="0">
+        <span class="val" id="botXVal">0.00</span>
+      </div>
+      <div class="row">
+        <label>Bottom Z</label>
+        <input type="range" id="botZ" min="-2" max="2" step="0.05" value="0">
+        <span class="val" id="botZVal">0.00</span>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-title">Geometry</div>
+      <div class="row">
+        <label>Ring shape</label>
+        <select id="ringShape">
+          <option value="circle">Circle</option>
+          <option value="star">Star</option>
+          <option value="heart">Heart</option>
+          <option value="square">Square</option>
+          <option value="triangle">Triangle</option>
+          <option value="human">Human (parametric)</option>
+          <option value="svgSilhouette">SVG Silhouette</option>
+          <option value="glbModel">3D Model silhouette</option>
+          <option value="humanInside">3D Model inside</option>
+        </select>
+      </div>
+      <div class="row">
+        <label>3D Model</label>
+        <select id="modelSelect">
+          <option value="assets/free_pack_male_base_mesh.glb">Male base mesh</option>
+          <option value="assets/2-headed_human_low_poly.glb">2-headed human</option>
+          <option value="assets/planar_human_base_rigs.glb">Planar human</option>
+          <option value="assets/girlhead.glb">Girl head</option>
+          <option value="assets/moving_statues_of_a_man_and_woman.glb">Man & Woman statues</option>
+          <option value="assets/sculpture_001.glb">Sculpture</option>
+        </select>
+      </div>
+      <div class="row">
+        <label>Throat radius</label>
+        <input type="range" id="throatRadius" min="0.1" max="1" step="0.01" value="0.35">
+        <span class="val" id="throatRadiusVal">0.35</span>
+      </div>
+      <div class="row">
+        <label>Neck length</label>
+        <input type="range" id="neckLength" min="0.3" max="2" step="0.05" value="0.9">
+        <span class="val" id="neckLengthVal">0.90</span>
+      </div>
+      <div class="row">
+        <label>Funnel depth</label>
+        <input type="range" id="funnelExtent" min="0.5" max="3" step="0.1" value="2.0">
+        <span class="val" id="funnelExtentVal">2.0</span>
+      </div>
+      <div class="row">
+        <label>Disc width</label>
+        <input type="range" id="discWidth" min="1" max="4" step="0.1" value="2.2">
+        <span class="val" id="discWidthVal">2.2</span>
+      </div>
+      <div class="row">
+        <label>Meridians</label>
+        <input type="range" id="meridianCount" min="6" max="48" step="1" value="24">
+        <span class="val" id="meridianCountVal">24</span>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-title">Presets</div>
+      <div class="row" style="gap:4px">
+        <input type="text" id="presetName" placeholder="Preset name" style="flex:1;background:#f5f5f5;border:1px solid #ccc;border-radius:3px;padding:2px 6px;font-family:inherit;font-size:11px;color:#333;">
+        <button id="savePreset" style="background:#f5f5f5;border:1px solid #ccc;border-radius:3px;padding:2px 8px;font-family:inherit;font-size:11px;color:#333;cursor:pointer;white-space:nowrap;">Save</button>
+      </div>
+      <div id="presetList" style="margin-top:6px;"></div>
+      <div class="row" style="gap:4px;margin-top:8px;">
+        <button id="downloadPresets" style="flex:1;background:#f5f5f5;border:1px solid #ccc;border-radius:3px;padding:3px 8px;font-family:inherit;font-size:10px;color:#333;cursor:pointer;">Download</button>
+        <label id="uploadPresetsLabel" style="flex:1;background:#f5f5f5;border:1px solid #ccc;border-radius:3px;padding:3px 8px;font-family:inherit;font-size:10px;color:#333;cursor:pointer;text-align:center;">
+          Upload
+          <input type="file" id="uploadPresets" accept=".json" style="display:none;">
+        </label>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+function resize() {
+  const dpr = Math.min(window.devicePixelRatio, 2);
+  canvas.width = window.innerWidth * dpr;
+  canvas.height = window.innerHeight * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+window.addEventListener('resize', resize);
+resize();
+
+const W = () => window.innerWidth;
+const H = () => window.innerHeight;
+
+// === CONTROLS ===
+const toggleBtn = document.getElementById('toggle');
+const panel = document.getElementById('panel');
+toggleBtn.addEventListener('click', () => panel.classList.toggle('open'));
+
+// Control state
+const cfg = {
+  bgColor: '#f0f0f0',
+  lineColor: '#32323a',
+  ringWidth: 1,
+  meridianWidth: 0.8,
+  meridianOpacity: 0.25,
+  ringOpacity: 0.7,
+  flowSpeed: 0.00015,
+  flowDir: 1,
+  ringCount: 28,
+  throatRadius: 0.35,
+  neckLength: 0.9,
+  funnelExtent: 2.0,
+  discWidth: 2.2,
+  meridianCount: 24,
+  orientation: 'portrait',
+  topX: 0, topZ: 0,
+  botX: 0, botZ: 0,
+  ringShape: 'circle',
+};
+
+// Bind sliders
+function bindRange(id, key, decimals = 2) {
+  const input = document.getElementById(id);
+  const valEl = document.getElementById(id + 'Val');
+  input.addEventListener('input', () => {
+    cfg[key] = parseFloat(input.value);
+    valEl.textContent = cfg[key].toFixed(decimals);
+  });
+}
+function bindColor(id, key) {
+  const input = document.getElementById(id);
+  input.addEventListener('input', () => {
+    cfg[key] = input.value;
+    if (key === 'bgColor') document.body.style.background = cfg.bgColor;
+  });
+}
+
+bindColor('bgColor', 'bgColor');
+bindColor('lineColor', 'lineColor');
+bindRange('ringWidth', 'ringWidth', 1);
+bindRange('meridianWidth', 'meridianWidth', 1);
+bindRange('meridianOpacity', 'meridianOpacity', 2);
+bindRange('ringOpacity', 'ringOpacity', 2);
+bindRange('flowSpeed', 'flowSpeed', 2);
+bindRange('ringCount', 'ringCount', 0);
+bindRange('throatRadius', 'throatRadius', 2);
+bindRange('neckLength', 'neckLength', 2);
+bindRange('funnelExtent', 'funnelExtent', 1);
+bindRange('discWidth', 'discWidth', 1);
+bindRange('meridianCount', 'meridianCount', 0);
+bindRange('topX', 'topX', 2);
+bindRange('topZ', 'topZ', 2);
+bindRange('botX', 'botX', 2);
+bindRange('botZ', 'botZ', 2);
+
+// Flow direction
+document.getElementById('flowDir').addEventListener('change', (e) => {
+  cfg.flowDir = parseInt(e.target.value);
+});
+document.getElementById('orientation').addEventListener('change', (e) => {
+  cfg.orientation = e.target.value;
+});
+document.getElementById('ringShape').addEventListener('change', (e) => {
+  cfg.ringShape = e.target.value;
+});
+document.getElementById('modelSelect').addEventListener('change', (e) => {
+  loadGLB(e.target.value);
+});
+
+// Fix flowSpeed display
+document.getElementById('flowSpeedVal').textContent = '0.15';
+document.getElementById('flowSpeed').addEventListener('input', (e) => {
+  document.getElementById('flowSpeedVal').textContent = (parseFloat(e.target.value) * 1000).toFixed(2);
+});
+
+// === PRESETS ===
+const PRESETS_KEY = 'wormhole_presets';
+
+function getPresets() {
+  try { return JSON.parse(localStorage.getItem(PRESETS_KEY)) || {}; }
+  catch { return {}; }
+}
+
+function savePreset(name) {
+  const presets = getPresets();
+  // Snapshot all cfg values + select values
+  presets[name] = {
+    ...cfg,
+    modelSelect: document.getElementById('modelSelect').value,
+  };
+  localStorage.setItem(PRESETS_KEY, JSON.stringify(presets));
+  renderPresetList();
+}
+
+function loadPreset(name) {
+  const presets = getPresets();
+  const p = presets[name];
+  if (!p) return;
+
+  // Apply cfg values
+  Object.keys(p).forEach(k => {
+    if (k === 'modelSelect') return;
+    if (cfg.hasOwnProperty(k)) cfg[k] = p[k];
+  });
+
+  // Update all UI controls to match
+  document.body.style.background = cfg.bgColor;
+  document.getElementById('bgColor').value = cfg.bgColor;
+  document.getElementById('lineColor').value = cfg.lineColor;
+
+  // Ranges
+  const rangeMap = {
+    ringWidth: 'ringWidth', meridianWidth: 'meridianWidth',
+    meridianOpacity: 'meridianOpacity', ringOpacity: 'ringOpacity',
+    flowSpeed: 'flowSpeed', ringCount: 'ringCount',
+    throatRadius: 'throatRadius', neckLength: 'neckLength',
+    funnelExtent: 'funnelExtent', discWidth: 'discWidth',
+    meridianCount: 'meridianCount',
+    topX: 'topX', topZ: 'topZ', botX: 'botX', botZ: 'botZ',
+  };
+  for (const [cfgKey, elId] of Object.entries(rangeMap)) {
+    const el = document.getElementById(elId);
+    if (el) {
+      el.value = cfg[cfgKey];
+      const valEl = document.getElementById(elId + 'Val');
+      if (valEl) {
+        if (elId === 'flowSpeed') valEl.textContent = (cfg[cfgKey] * 1000).toFixed(2);
+        else if (typeof cfg[cfgKey] === 'number') valEl.textContent = Number.isInteger(cfg[cfgKey]) ? cfg[cfgKey] : cfg[cfgKey].toFixed(2);
+      }
+    }
+  }
+
+  // Selects
+  document.getElementById('ringShape').value = cfg.ringShape;
+  document.getElementById('flowDir').value = cfg.flowDir;
+  document.getElementById('orientation').value = cfg.orientation;
+  if (p.modelSelect) {
+    const ms = document.getElementById('modelSelect');
+    ms.value = p.modelSelect;
+    loadGLB(p.modelSelect);
+  }
+}
+
+function deletePreset(name) {
+  const presets = getPresets();
+  delete presets[name];
+  localStorage.setItem(PRESETS_KEY, JSON.stringify(presets));
+  renderPresetList();
+}
+
+function renderPresetList() {
+  const list = document.getElementById('presetList');
+  const presets = getPresets();
+  const names = Object.keys(presets);
+  if (names.length === 0) { list.innerHTML = ''; return; }
+
+  list.innerHTML = names.map(name => `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px;">
+      <span style="cursor:pointer;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" onclick="loadPreset('${name.replace(/'/g, "\\'")}')">${name}</span>
+      <button onclick="deletePreset('${name.replace(/'/g, "\\'")}')" style="background:none;border:none;color:#999;cursor:pointer;font-size:13px;padding:0 2px;">&times;</button>
+    </div>
+  `).join('');
+}
+
+document.getElementById('savePreset').addEventListener('click', () => {
+  const name = document.getElementById('presetName').value.trim();
+  if (!name) return;
+  savePreset(name);
+  document.getElementById('presetName').value = '';
+});
+
+// Init preset list
+renderPresetList();
+
+// Download all presets as JSON
+document.getElementById('downloadPresets').addEventListener('click', () => {
+  const presets = getPresets();
+  const blob = new Blob([JSON.stringify(presets, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'wormhole-presets.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+// Upload presets from JSON (merges with existing)
+document.getElementById('uploadPresets').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const imported = JSON.parse(reader.result);
+      const existing = getPresets();
+      const merged = { ...existing, ...imported };
+      localStorage.setItem(PRESETS_KEY, JSON.stringify(merged));
+      renderPresetList();
+      console.log('Imported', Object.keys(imported).length, 'presets');
+    } catch (err) {
+      console.error('Invalid preset file:', err);
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = ''; // reset so same file can be re-uploaded
+});
+
+// === WORMHOLE GEOMETRY ===
+const MERIDIAN_SEGMENTS = 80;
+
+// === SHAPE DEFINITIONS ===
+// Static shapes: array of [x, z] normalized to unit radius
+// === SVG SILHOUETTE ===
+// Parse SVG path and convert to normalized points
+let svgSilhouetteShape = null;
+
+function loadSVGSilhouette(url) {
+  fetch(url).then(r => r.text()).then(svgText => {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(svgText, 'image/svg+xml');
+    const pathEl = doc.querySelector('path');
+    if (!pathEl) { console.error('No path in SVG'); return; }
+
+    // Use browser's built-in SVG path parsing
+    const svgNS = 'http://www.w3.org/2000/svg';
+    const tmpSvg = document.createElementNS(svgNS, 'svg');
+    const tmpPath = document.createElementNS(svgNS, 'path');
+    tmpPath.setAttribute('d', pathEl.getAttribute('d'));
+    tmpSvg.appendChild(tmpPath);
+    document.body.appendChild(tmpSvg);
+
+    // Sample points along the path
+    const totalLen = tmpPath.getTotalLength();
+    const numPts = 200;
+    const pts = [];
+    for (let i = 0; i <= numPts; i++) {
+      const p = tmpPath.getPointAtLength((i / numPts) * totalLen);
+      pts.push([p.x, p.y]);
+    }
+    document.body.removeChild(tmpSvg);
+
+    // Normalize: center and scale to unit
+    let maxR = 0;
+    const cx = pts.reduce((s, p) => s + p[0], 0) / pts.length;
+    const cy = pts.reduce((s, p) => s + p[1], 0) / pts.length;
+    for (const p of pts) {
+      const r = Math.sqrt((p[0]-cx)**2 + (p[1]-cy)**2);
+      if (r > maxR) maxR = r;
+    }
+    // SVG Y is inverted (down = positive), flip it
+    svgSilhouetteShape = pts.map(p => [(p[0]-cx)/maxR, -(p[1]-cy)/maxR]);
+    svgSilhouetteShape.push(svgSilhouetteShape[0].slice());
+    console.log('SVG silhouette loaded:', svgSilhouetteShape.length, 'points');
+  });
+}
+
+// Load on startup
+loadSVGSilhouette('assets/silueta-man.svg');
+
+function generateStaticShape(name, n) {
+  const pts = [];
+  if (name === 'circle') {
+    for (let i = 0; i <= n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      pts.push([Math.cos(a), Math.sin(a)]);
+    }
+  } else if (name === 'star') {
+    const spikes = 5;
+    for (let i = 0; i <= spikes * 2; i++) {
+      const a = (i / (spikes * 2)) * Math.PI * 2 - Math.PI / 2;
+      const r = i % 2 === 0 ? 1 : 0.4;
+      pts.push([Math.cos(a) * r, Math.sin(a) * r]);
+    }
+    pts.push(pts[0].slice());
+  } else if (name === 'heart') {
+    for (let i = 0; i <= n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      pts.push([
+        0.65 * (16 * Math.pow(Math.sin(a), 3)) / 16,
+        0.65 * (13*Math.cos(a) - 5*Math.cos(2*a) - 2*Math.cos(3*a) - Math.cos(4*a)) / 16
+      ]);
+    }
+  } else if (name === 'square') {
+    const s = 0.75;
+    pts.push([-s,-s],[s,-s],[s,s],[-s,s],[-s,-s]);
+  } else if (name === 'triangle') {
+    const s = 0.9;
+    pts.push([0,s],[s*Math.cos(-Math.PI/6),s*Math.sin(-Math.PI/6)],
+             [s*Math.cos(-5*Math.PI/6),s*Math.sin(-5*Math.PI/6)],[0,s]);
+  }
+  return pts;
+}
+
+// === MORPHING BODY SHAPES ===
+// Human body defined as cross-section keyframes
+// Each keyframe: { t, rx, rz, pinch }
+// rx/rz = ellipse radii, pinch = cos(2θ) modulation (>0 creates figure-8 for legs)
+const bodyKeyframes = [
+  { t: 0.00, rx: 0.00, rz: 0.00, pinch: 0 },    // entry point
+  { t: 0.04, rx: 0.20, rz: 0.20, pinch: 0 },    // top of skull
+  { t: 0.10, rx: 0.30, rz: 0.28, pinch: 0 },    // head widest
+  { t: 0.16, rx: 0.26, rz: 0.24, pinch: 0 },    // jaw
+  { t: 0.20, rx: 0.12, rz: 0.11, pinch: 0 },    // neck
+  { t: 0.26, rx: 0.65, rz: 0.22, pinch: 0 },    // shoulders
+  { t: 0.34, rx: 0.52, rz: 0.22, pinch: 0 },    // chest
+  { t: 0.42, rx: 0.45, rz: 0.18, pinch: 0 },    // lower torso
+  { t: 0.48, rx: 0.37, rz: 0.16, pinch: 0 },    // waist
+  { t: 0.54, rx: 0.42, rz: 0.22, pinch: 0 },    // hips
+  { t: 0.62, rx: 0.38, rz: 0.18, pinch: 0.35 }, // upper thigh (start splitting)
+  { t: 0.70, rx: 0.32, rz: 0.14, pinch: 0.55 }, // mid thigh
+  { t: 0.78, rx: 0.26, rz: 0.12, pinch: 0.65 }, // knee
+  { t: 0.86, rx: 0.22, rz: 0.10, pinch: 0.70 }, // calf
+  { t: 0.93, rx: 0.18, rz: 0.06, pinch: 0.75 }, // ankle
+  { t: 0.97, rx: 0.10, rz: 0.04, pinch: 0.50 }, // feet
+  { t: 1.00, rx: 0.00, rz: 0.00, pinch: 0 },    // exit point
+];
+
+function lerpBodyParams(bodyT) {
+  // Clamp
+  if (bodyT <= 0) return { rx: 0, rz: 0, pinch: 0 };
+  if (bodyT >= 1) return { rx: 0, rz: 0, pinch: 0 };
+
+  // Find surrounding keyframes
+  let a = bodyKeyframes[0], b = bodyKeyframes[1];
+  for (let i = 0; i < bodyKeyframes.length - 1; i++) {
+    if (bodyT >= bodyKeyframes[i].t && bodyT <= bodyKeyframes[i + 1].t) {
+      a = bodyKeyframes[i];
+      b = bodyKeyframes[i + 1];
+      break;
+    }
+  }
+
+  const s = (bodyT - a.t) / (b.t - a.t);
+  // Smooth interpolation
+  const ss = s * s * (3 - 2 * s);
+  return {
+    rx: a.rx + (b.rx - a.rx) * ss,
+    rz: a.rz + (b.rz - a.rz) * ss,
+    pinch: a.pinch + (b.pinch - a.pinch) * ss,
+  };
+}
+
+// Generate a morphing body cross-section at position bodyT
+function getBodySlice(bodyT, n) {
+  const p = lerpBodyParams(bodyT);
+  const pts = [];
+  for (let i = 0; i <= n; i++) {
+    const a = (i / n) * Math.PI * 2;
+    // cos(2a) modulation: creates figure-8 / peanut shape for legs
+    // Positive pinch → wider at 0/π (left/right), pinched at π/2, 3π/2 (front/back)
+    const mod = 1 + p.pinch * Math.cos(2 * a);
+    const r = Math.max(0.001, mod);
+    pts.push([p.rx * r * Math.cos(a), p.rz * r * Math.sin(a)]);
+  }
+  return pts;
+}
+
+// Get shape at position t along the wormhole path
+// For morphing shapes (human), each ring has a unique shape based on t
+// For static shapes, all rings share the same shape
+// === GLB BODY SLICES ===
+// Interpolate between GLB cross-section slices
+function getGlbBodySlice(t, n) {
+  if (!window.GLB_BODY_SLICES || window.GLB_BODY_SLICES.length === 0) {
+    return generateStaticShape('circle', n);
+  }
+  const slices = window.GLB_BODY_SLICES;
+
+  // Clamp t
+  if (t <= slices[0].t) return slices[0].pts;
+  if (t >= slices[slices.length-1].t) return slices[slices.length-1].pts;
+
+  // Find surrounding slices
+  let a = slices[0], b = slices[1];
+  for (let i = 0; i < slices.length - 1; i++) {
+    if (t >= slices[i].t && t <= slices[i+1].t) {
+      a = slices[i]; b = slices[i+1]; break;
+    }
+  }
+
+  // Interpolate between the two slices
+  const s = (t - a.t) / (b.t - a.t);
+  const ss = s * s * (3 - 2*s); // smoothstep
+  const pts = [];
+  const len = Math.min(a.pts.length, b.pts.length);
+  for (let i = 0; i < len; i++) {
+    pts.push([
+      a.pts[i][0] + (b.pts[i][0] - a.pts[i][0]) * ss,
+      a.pts[i][1] + (b.pts[i][1] - a.pts[i][1]) * ss
+    ]);
+  }
+  return pts;
+}
+
+function getShapeAt(name, t, n) {
+  if (name === 'svgSilhouette') {
+    if (svgSilhouetteShape) return svgSilhouetteShape;
+    return generateStaticShape('circle', n);
+  }
+  if (name === 'human') {
+    return getBodySlice(t, n);
+  }
+  if (name === 'glbModel' || name === 'humanGlb') {
+    if (modelSilhouette) return modelSilhouette;
+    return generateStaticShape('circle', n);
+  }
+  // humanInside uses circles — shape stays circular, radius is modulated
+  return generateStaticShape('circle', n);
+}
+
+// === BODY ENVELOPE (for "inside" mode) ===
+// Get the max radius of the body cross-section at position t
+function getBodyEnvelopeRadius(t) {
+  if (!window.GLB_BODY_SLICES || window.GLB_BODY_SLICES.length === 0) return 0;
+  const slices = window.GLB_BODY_SLICES;
+
+  if (t <= slices[0].t || t >= slices[slices.length-1].t) return 0;
+
+  let a = slices[0], b = slices[1];
+  for (let i = 0; i < slices.length - 1; i++) {
+    if (t >= slices[i].t && t <= slices[i+1].t) {
+      a = slices[i]; b = slices[i+1]; break;
+    }
+  }
+
+  const s = (t - a.t) / (b.t - a.t);
+  const ss = s * s * (3 - 2 * s);
+
+  // Max radius of each slice
+  const rA = Math.max(...a.pts.map(p => Math.sqrt(p[0]*p[0] + p[1]*p[1])));
+  const rB = Math.max(...b.pts.map(p => Math.sqrt(p[0]*p[0] + p[1]*p[1])));
+
+  return rA + (rB - rA) * ss;
+}
+
+function funnelR(v) {
+  return cfg.throatRadius * Math.cosh(v * cfg.neckLength);
+}
+function funnelZ(v) {
+  return cfg.throatRadius * Math.sinh(v * cfg.neckLength) / cfg.neckLength;
+}
+
+function profileAt(t) {
+  const discFraction = 0.15;
+  const topR = funnelR(cfg.funnelExtent);
+  const topZ = funnelZ(cfg.funnelExtent);
+
+  let r, z;
+  if (t <= discFraction) {
+    const s = t / discFraction;
+    r = cfg.discWidth + (topR - cfg.discWidth) * s;
+    z = topZ;
+  } else if (t <= 0.5) {
+    const s = (t - discFraction) / (0.5 - discFraction);
+    const v = cfg.funnelExtent * (1 - s);
+    r = funnelR(v);
+    z = funnelZ(v);
+  } else if (t <= 1 - discFraction) {
+    const s = (t - 0.5) / (0.5 - discFraction);
+    const v = cfg.funnelExtent * s;
+    r = funnelR(v);
+    z = -funnelZ(v);
+  } else {
+    const s = (t - (1 - discFraction)) / discFraction;
+    r = topR + (cfg.discWidth - topR) * s;
+    z = -funnelZ(cfg.funnelExtent);
+  }
+
+  // "Human (inside)" mode: bulge the wormhole radius to fit the body
+  if (cfg.ringShape === 'humanInside' && modelEnvelope && modelEnvelope.length > 0) {
+    // Map wormhole z position to model Y position
+    // The model is centered at Y=0 in wormhole space, and z from profileAt is the height
+    const modelYMin = modelEnvelope[0].y;
+    const modelYMax = modelEnvelope[modelEnvelope.length - 1].y;
+
+    // z from profile is the wormhole height — positive is top, negative is bottom
+    // The model's Y maps to wormhole's z (vertical axis)
+    if (z <= modelYMax && z >= modelYMin) {
+      // Find the envelope radius at this height
+      let bodyR = 0;
+      for (let i = 0; i < modelEnvelope.length - 1; i++) {
+        if (z >= modelEnvelope[i].y && z <= modelEnvelope[i + 1].y) {
+          const s = (z - modelEnvelope[i].y) / (modelEnvelope[i + 1].y - modelEnvelope[i].y);
+          bodyR = modelEnvelope[i].r + (modelEnvelope[i + 1].r - modelEnvelope[i].r) * s;
+          break;
+        }
+      }
+      if (bodyR > 0) {
+        // Wormhole wraps tightly around the body with some padding
+        const padding = cfg.throatRadius * 0.15;
+        r = Math.max(r, bodyR + padding);
+      }
+    }
+  }
+
+  return { r, z };
+}
+
+// === MOUSE DRAG ROTATION ===
+let rotX = 0.12;
+let rotY = 0.0;
+let isDragging = false;
+let lastMouseX = 0, lastMouseY = 0;
+
+canvas.addEventListener('mousedown', (e) => {
+  isDragging = true;
+  lastMouseX = e.clientX;
+  lastMouseY = e.clientY;
+});
+window.addEventListener('mousemove', (e) => {
+  if (!isDragging) return;
+  const dx = e.clientX - lastMouseX;
+  const dy = e.clientY - lastMouseY;
+  rotY += dx * 0.005;
+  rotX += dy * 0.005;
+  rotX = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, rotX));
+  lastMouseX = e.clientX;
+  lastMouseY = e.clientY;
+});
+window.addEventListener('mouseup', () => { isDragging = false; });
+
+canvas.addEventListener('touchstart', (e) => {
+  isDragging = true;
+  lastMouseX = e.touches[0].clientX;
+  lastMouseY = e.touches[0].clientY;
+}, { passive: true });
+window.addEventListener('touchmove', (e) => {
+  if (!isDragging) return;
+  const dx = e.touches[0].clientX - lastMouseX;
+  const dy = e.touches[0].clientY - lastMouseY;
+  rotY += dx * 0.005;
+  rotX += dy * 0.005;
+  rotX = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, rotX));
+  lastMouseX = e.touches[0].clientX;
+  lastMouseY = e.touches[0].clientY;
+}, { passive: true });
+window.addEventListener('touchend', () => { isDragging = false; });
+
+// 3D projection
+function project(x, y, z, cx, cy, scale) {
+  const cosY = Math.cos(rotY), sinY = Math.sin(rotY);
+  const x1 = x * cosY - z * sinY;
+  const z1 = x * sinY + z * cosY;
+
+  const cosX = Math.cos(rotX), sinX = Math.sin(rotX);
+  const y2 = y * cosX - z1 * sinX;
+  const z2 = y * sinX + z1 * cosX;
+
+  const fov = 5;
+  const p = fov / (fov + z2);
+
+  let sx = x1 * scale * p;
+  let sy = -y2 * scale * p;
+
+  // Landscape: rotate 90 degrees on screen
+  if (cfg.orientation === 'landscape') {
+    const tmp = sx;
+    sx = -sy;
+    sy = tmp;
+  }
+
+  return { x: cx + sx, y: cy + sy, z: z2 };
+}
+
+// Parse hex color to r,g,b
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return { r, g, b };
+}
+
+// Smooth mouth offset: interpolates between top and bottom offsets
+// t=0 → top offset, t=1 → bottom offset, smooth cubic easing through throat
+function mouthOffset(t) {
+  // Smooth interpolation with ease in/out
+  const s = t * t * (3 - 2 * t); // smoothstep
+  const ox = cfg.topX * (1 - s) + cfg.botX * s;
+  const oz = cfg.topZ * (1 - s) + cfg.botZ * s;
+  return { ox, oz };
+}
+
+function drawRing(t, cx, cy, scale) {
+  const prof = profileAt(t);
+  const { ox, oz } = mouthOffset(t);
+  const shape = getShapeAt(cfg.ringShape, t, cfg.meridianCount);
+  ctx.beginPath();
+  for (let j = 0; j < shape.length; j++) {
+    const x = prof.r * shape[j][0] + ox;
+    const z = prof.r * shape[j][1] + oz;
+    const pt = project(x, prof.z, z, cx, cy, scale);
+    if (j === 0) ctx.moveTo(pt.x, pt.y);
+    else ctx.lineTo(pt.x, pt.y);
+  }
+  ctx.stroke();
+}
+
+function drawMeridians(cx, cy, scale) {
+  // For morphing shapes, each meridian follows vertex j through all t positions
+  const n = cfg.meridianCount;
+  const sampleShape = getShapeAt(cfg.ringShape, 0.5, n);
+  const count = Math.min(sampleShape.length - 1, n);
+  const step = Math.max(1, Math.floor(sampleShape.length / count));
+
+  for (let j = 0; j < sampleShape.length - 1; j += step) {
+    ctx.beginPath();
+    for (let i = 0; i <= MERIDIAN_SEGMENTS; i++) {
+      const t = i / MERIDIAN_SEGMENTS;
+      const prof = profileAt(t);
+      const { ox, oz } = mouthOffset(t);
+      // Get shape at this t position — vertex j morphs as t changes
+      const shape = getShapeAt(cfg.ringShape, t, n);
+      const idx = Math.min(j, shape.length - 1);
+      const x = prof.r * shape[idx][0] + ox;
+      const z = prof.r * shape[idx][1] + oz;
+      const pt = project(x, prof.z, z, cx, cy, scale);
+      if (i === 0) ctx.moveTo(pt.x, pt.y);
+      else ctx.lineTo(pt.x, pt.y);
+    }
+    ctx.stroke();
+  }
+}
+
+// === 3D MODEL LOADING ===
+let modelVertices = null; // [[x,y,z], ...] in wormhole coordinate space
+let modelEdges = null;    // [[i,j], ...] unique edges
+let modelEnvelope = null; // [{y, r}, ...] max radius at each Y level
+let modelSilhouette = null; // [[x,y], ...] front-view outline of model
+
+async function loadGLB(url) {
+  const resp = await fetch(url);
+  const arrayBuf = await resp.arrayBuffer();
+  const buf = new DataView(arrayBuf);
+
+  const chunk0Len = buf.getUint32(12, true);
+  const jsonStr = new TextDecoder().decode(new Uint8Array(arrayBuf, 20, chunk0Len));
+  const json = JSON.parse(jsonStr);
+  const binOffset = 20 + chunk0Len + 8;
+
+  // Collect ALL vertices and edges from ALL meshes
+  const rawVerts = [];
+  const allEdges = [];
+  const edgeSet = new Set();
+  let vertOffset = 0;
+
+  for (const mesh of json.meshes) {
+    for (const prim of mesh.primitives) {
+      if (prim.attributes.POSITION === undefined) continue;
+      const posAcc = json.accessors[prim.attributes.POSITION];
+      const posBv = json.bufferViews[posAcc.bufferView];
+      const posStart = binOffset + (posBv.byteOffset || 0);
+      const posStride = posBv.byteStride || 12;
+
+      for (let i = 0; i < posAcc.count; i++) {
+        const off = posStart + i * posStride;
+        rawVerts.push([
+          buf.getFloat32(off, true),
+          buf.getFloat32(off + 4, true),
+          buf.getFloat32(off + 8, true)
+        ]);
+      }
+
+      // Indices
+      if (prim.indices !== undefined) {
+        const idxAcc = json.accessors[prim.indices];
+        const idxBv = json.bufferViews[idxAcc.bufferView];
+        const idxStart = binOffset + (idxBv.byteOffset || 0);
+        const isShort = idxAcc.componentType === 5123;
+        for (let t = 0; t < idxAcc.count; t += 3) {
+          const tri = [];
+          for (let e = 0; e < 3; e++) {
+            const idx = t + e;
+            tri.push(vertOffset + (isShort
+              ? buf.getUint16(idxStart + idx * 2, true)
+              : buf.getUint32(idxStart + idx * 4, true)));
+          }
+          for (let e = 0; e < 3; e++) {
+            const a = tri[e], b = tri[(e+1)%3];
+            const key = Math.min(a,b) + ',' + Math.max(a,b);
+            if (!edgeSet.has(key)) {
+              edgeSet.add(key);
+              allEdges.push([a, b]);
+            }
+          }
+        }
+      }
+      vertOffset += posAcc.count;
+    }
+  }
+
+  // Auto-scale: fit model to ~2 wormhole units tall
+  let yMin = Infinity, yMax = -Infinity;
+  let xMin = Infinity, xMax = -Infinity;
+  let zMin = Infinity, zMax = -Infinity;
+  for (const v of rawVerts) {
+    if (v[1] < yMin) yMin = v[1];
+    if (v[1] > yMax) yMax = v[1];
+    if (v[0] < xMin) xMin = v[0];
+    if (v[0] > xMax) xMax = v[0];
+    if (v[2] < zMin) zMin = v[2];
+    if (v[2] > zMax) zMax = v[2];
+  }
+  const yMid = (yMin + yMax) / 2;
+  const xMid = (xMin + xMax) / 2;
+  const zMid = (zMin + zMax) / 2;
+  const maxExtent = Math.max(yMax - yMin, xMax - xMin, zMax - zMin);
+  const modelScale = 2.0 / maxExtent; // fit into ~2 units
+
+  // Scale and center into wormhole space
+  const verts = rawVerts.map(v => [
+    (v[0] - xMid) * modelScale,
+    (v[1] - yMid) * modelScale,
+    (v[2] - zMid) * modelScale
+  ]);
+
+  modelVertices = verts;
+  modelEdges = allEdges;
+
+  // Compute silhouette: rasterize projected triangles to an offscreen canvas,
+  // then trace the outer contour using Moore boundary tracing.
+  {
+    const GW = 200, GH = 300;
+    const offCanvas = document.createElement('canvas');
+    offCanvas.width = GW; offCanvas.height = GH;
+    const offCtx = offCanvas.getContext('2d');
+    offCtx.fillStyle = '#000';
+
+    const svXs = verts.map(v => v[0]), svYs = verts.map(v => v[1]);
+    const sXMin = Math.min(...svXs), sXMax = Math.max(...svXs);
+    const sYMin = Math.min(...svYs), sYMax = Math.max(...svYs);
+    const pad = 4;
+    const toGx = x => pad + (x - sXMin) / (sXMax - sXMin) * (GW - 2*pad);
+    const toGy = y => pad + (sYMax - y) / (sYMax - sYMin) * (GH - 2*pad);
+
+    // Rasterize all triangles (projected to XY)
+    let triVertOff = 0;
+    for (const mesh of json.meshes) {
+      for (const prim of mesh.primitives) {
+        if (prim.indices === undefined || prim.attributes.POSITION === undefined) continue;
+        const idxAcc2 = json.accessors[prim.indices];
+        const idxBv2 = json.bufferViews[idxAcc2.bufferView];
+        const idxStart2 = binOffset + (idxBv2.byteOffset || 0);
+        const isShort2 = idxAcc2.componentType === 5123;
+        const posCount = json.accessors[prim.attributes.POSITION].count;
+        for (let ti = 0; ti < idxAcc2.count; ti += 3) {
+          const tri = [];
+          for (let e = 0; e < 3; e++) {
+            const raw = isShort2
+              ? buf.getUint16(idxStart2 + (ti+e)*2, true)
+              : buf.getUint32(idxStart2 + (ti+e)*4, true);
+            tri.push(triVertOff + raw);
+          }
+          offCtx.beginPath();
+          offCtx.moveTo(toGx(verts[tri[0]][0]), toGy(verts[tri[0]][1]));
+          offCtx.lineTo(toGx(verts[tri[1]][0]), toGy(verts[tri[1]][1]));
+          offCtx.lineTo(toGx(verts[tri[2]][0]), toGy(verts[tri[2]][1]));
+          offCtx.closePath();
+          offCtx.fill();
+        }
+        triVertOff += posCount;
+      }
+    }
+
+    // Read pixel data
+    const imgData = offCtx.getImageData(0, 0, GW, GH).data;
+    const filled = (x, y) => x >= 0 && x < GW && y >= 0 && y < GH && imgData[(y*GW+x)*4+3] > 128;
+
+    // Moore boundary tracing
+    // Find start: first filled pixel scanning left-to-right, top-to-bottom
+    let sx = -1, sy = -1;
+    for (let y = 0; y < GH && sx === -1; y++)
+      for (let x = 0; x < GW; x++)
+        if (filled(x, y)) { sx = x; sy = y; break; }
+
+    if (sx >= 0) {
+      // 8-connected neighbors clockwise: E, SE, S, SW, W, NW, N, NE
+      const dx8 = [1, 1, 0, -1, -1, -1, 0, 1];
+      const dy8 = [0, 1, 1, 1, 0, -1, -1, -1];
+
+      const contour = [];
+      let cx = sx, cy = sy;
+      let dir = 6; // came from above (north), so backtrack = north = dir 6
+
+      do {
+        contour.push([cx, cy]);
+        // Check neighbors clockwise starting from (dir+1)%8
+        let found = false;
+        const startDir = (dir + 1) % 8;
+        for (let i = 0; i < 8; i++) {
+          const d = (startDir + i) % 8;
+          const nx = cx + dx8[d], ny = cy + dy8[d];
+          if (filled(nx, ny)) {
+            dir = (d + 4) % 8; // backtrack = opposite of where we moved
+            cx = nx; cy = ny;
+            found = true;
+            break;
+          }
+        }
+        if (!found) break;
+      } while ((cx !== sx || cy !== sy) && contour.length < GW * GH);
+
+      // Convert grid coords to normalized model coords
+      const outline = contour.map(([gx, gy]) => [
+        sXMin + (gx - pad) / (GW - 2*pad) * (sXMax - sXMin),
+        sYMax - (gy - pad) / (GH - 2*pad) * (sYMax - sYMin)
+      ]);
+
+      // Subsample if too many points
+      let sampled = outline;
+      if (outline.length > 200) {
+        const step = Math.ceil(outline.length / 200);
+        sampled = outline.filter((_, i) => i % step === 0);
+      }
+
+      let silMaxR = 0;
+      const cx0 = sampled.reduce((s, p) => s + p[0], 0) / sampled.length;
+      const cy0 = sampled.reduce((s, p) => s + p[1], 0) / sampled.length;
+      for (const p of sampled) {
+        const r = Math.sqrt((p[0]-cx0)**2 + (p[1]-cy0)**2);
+        if (r > silMaxR) silMaxR = r;
+      }
+      modelSilhouette = sampled.map(p => [(p[0]-cx0)/silMaxR, (p[1]-cy0)/silMaxR]);
+      modelSilhouette.push(modelSilhouette[0].slice());
+      console.log('Silhouette:', modelSilhouette.length, 'pts (from', contour.length, 'boundary)');
+    }
+  }
+
+  // Compute body envelope: max XZ radius at each Y level
+  // This tells the wormhole how wide the body is at each height
+  const yVals = verts.map(v => v[1]);
+  const modelYMin = Math.min(...yVals);
+  const modelYMax = Math.max(...yVals);
+  const ENV_SAMPLES = 80;
+  modelEnvelope = [];
+  for (let i = 0; i < ENV_SAMPLES; i++) {
+    const y = modelYMin + (modelYMax - modelYMin) * i / (ENV_SAMPLES - 1);
+    const band = 0.03; // Y band width in wormhole units
+    let maxR = 0;
+    for (const v of verts) {
+      if (Math.abs(v[1] - y) < band) {
+        const r = Math.sqrt(v[0]*v[0] + v[2]*v[2]);
+        if (r > maxR) maxR = r;
+      }
+    }
+    modelEnvelope.push({ y, r: maxR });
+  }
+  // Smooth the envelope to avoid jagged edges
+  for (let pass = 0; pass < 3; pass++) {
+    const smoothed = modelEnvelope.map((e, i) => {
+      if (i === 0 || i === modelEnvelope.length-1) return e;
+      return { y: e.y, r: (modelEnvelope[i-1].r + e.r + modelEnvelope[i+1].r) / 3 };
+    });
+    modelEnvelope = smoothed;
+  }
+
+  console.log('Model loaded:', verts.length, 'verts,', edges.length, 'edges,', ENV_SAMPLES, 'envelope samples');
+}
+
+function drawModel(cx, cy, scale) {
+  if (!modelVertices || !modelEdges) return;
+  const { r, g, b } = hexToRgb(cfg.lineColor);
+  ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${cfg.ringOpacity * 0.8})`;
+  ctx.lineWidth = cfg.ringWidth * 0.6;
+
+  for (const [a, b] of modelEdges) {
+    const va = modelVertices[a];
+    const vb = modelVertices[b];
+    const pa = project(va[0], va[1], va[2], cx, cy, scale);
+    const pb = project(vb[0], vb[1], vb[2], cx, cy, scale);
+    ctx.beginPath();
+    ctx.moveTo(pa.x, pa.y);
+    ctx.lineTo(pb.x, pb.y);
+    ctx.stroke();
+  }
+}
+
+// Load the model
+loadGLB('assets/free_pack_male_base_mesh.glb');
+
+function draw(time) {
+  const w = W(), h = H();
+  ctx.clearRect(0, 0, w, h);
+
+  const cx = w / 2;
+  const cy = h / 2;
+  const topZ = funnelZ(cfg.funnelExtent);
+  const fitDim = cfg.orientation === 'landscape' ? w : h;
+  const scale = (fitDim * 0.47) / (topZ * 2);
+
+  const { r, g, b } = hexToRgb(cfg.lineColor);
+
+  // Flow
+  const flowOffset = (time * cfg.flowSpeed * cfg.flowDir) % 1;
+
+  // Meridians
+  ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${cfg.meridianOpacity})`;
+  ctx.lineWidth = cfg.meridianWidth;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  drawMeridians(cx, cy, scale);
+
+  // Flowing rings
+  ctx.lineWidth = cfg.ringWidth;
+  const spacing = 1 / cfg.ringCount;
+
+  for (let i = 0; i < cfg.ringCount; i++) {
+    let t = ((i * spacing + flowOffset) % 1 + 1) % 1;
+
+    const edgeFade = Math.min(t, 1 - t) / 0.08;
+    const alpha = Math.min(edgeFade, 1) * cfg.ringOpacity;
+
+    if (alpha <= 0) continue;
+
+    ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    drawRing(t, cx, cy, scale);
+  }
+
+  // Draw 3D model inside the wormhole
+  if (cfg.ringShape === 'humanInside') {
+    drawModel(cx, cy, scale);
+  }
+
+  requestAnimationFrame(draw);
+}
+
+requestAnimationFrame(draw);
+</script>
+</body>
+</html>

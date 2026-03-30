@@ -1,0 +1,27 @@
+{
+  "Astral Body": {
+    "bgColor": "#0e0907",
+    "lineColor": "#94ffd1",
+    "ringWidth": 2.5,
+    "meridianWidth": 1.2,
+    "ringAlpha": 0.5,
+    "meridianAlpha": 0.1,
+    "glowIntensity": 1.5,
+    "glowFalloff": 4.0,
+    "flowSpeed": 0.02,
+    "flowDir": 1,
+    "ringCount": 60,
+    "autoRotSpeed": 0.0,
+    "bloomIntensity": 0.6,
+    "chromaticAberration": 0.003,
+    "vignette": 0.4,
+    "grain": 0.1,
+    "ringShape": "svgSilhouette",
+    "throatRadius": 0.93,
+    "throatScale": 0.3,
+    "funnelExtent": 0.5,
+    "discWidth": 2.2,
+    "meridians": 24,
+    "particleCount": 0
+  }
+}
