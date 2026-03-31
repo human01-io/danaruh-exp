@@ -1497,8 +1497,8 @@ void main() {
     float t1f = floor(u_time * 24.0);
     float t2f = t1f + 1.0;
     float tff = fract(u_time * 24.0);
-    float g1f = hash(gl_FragCoord.xy + t1f * 7.23) - 0.5;
-    float g2f = hash(gl_FragCoord.xy + t2f * 7.23) - 0.5;
+    float g1f = hash(gl_FragCoord.xy + mod(t1f, 100.0) * 7.23) - 0.5;
+    float g2f = hash(gl_FragCoord.xy + mod(t2f, 100.0) * 7.23) - 0.5;
     col += mix(g1f, g2f, tff * tff * (3.0 - 2.0 * tff)) * u_grain;
 
     fragColor = vec4(col, 1.0);
@@ -1529,8 +1529,8 @@ void main() {
     float t1 = floor(u_time * 24.0);
     float t2 = t1 + 1.0;
     float tf = fract(u_time * 24.0);
-    float g1 = hash(gl_FragCoord.xy + t1 * 7.23) - 0.5;
-    float g2 = hash(gl_FragCoord.xy + t2 * 7.23) - 0.5;
+    float g1 = hash(gl_FragCoord.xy + mod(t1, 100.0) * 7.23) - 0.5;
+    float g2 = hash(gl_FragCoord.xy + mod(t2, 100.0) * 7.23) - 0.5;
     float grainVal = mix(g1, g2, tf * tf * (3.0 - 2.0 * tf)) * u_grain;
     col += grainVal;
 
@@ -2693,7 +2693,7 @@ function render(time, dt) {
   gl.uniform1f(compU.u_chromaticAberration, state.chromaticAberration);
   gl.uniform1f(compU.u_vignette, state.vignette);
   gl.uniform1f(compU.u_grain, state.grain);
-  gl.uniform1f(compU.u_time, state.time);
+  gl.uniform1f(compU.u_time, state.time % 1000);
   gl.uniform3fv(compU.u_bgColor, state.bgColor);
   gl.uniform1f(compU.u_masterOpacity, state.masterOpacity);
   gl.uniform1f(compU.u_flatMode, state.flatMode ? 1.0 : 0.0);
