@@ -2680,7 +2680,7 @@ function render(time, dt) {
   gl.uniform1f(compU.u_bloomIntensity, state.bloomIntensity);
   gl.uniform1f(compU.u_chromaticAberration, state.chromaticAberration);
   gl.uniform1f(compU.u_vignette, state.vignette);
-  gl.uniform1f(compU.u_grain, isMobile ? state.grain * 0.5 : state.grain);
+  gl.uniform1f(compU.u_grain, isMobile ? 0.0 : state.grain);
   gl.uniform1f(compU.u_grainScale, isMobile ? 3.0 : 1.0);
   gl.uniform1f(compU.u_time, state.time % 1000);
   gl.uniform3fv(compU.u_bgColor, state.bgColor);
