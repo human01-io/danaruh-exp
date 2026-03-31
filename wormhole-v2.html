@@ -1498,9 +1498,17 @@ void main() {
     // Where poster is active but lines aren't: poster color
     // Where both are active: cutout to bg
     // Where only lines: line color
-    float lOnly = clamp(lineMask * (1.0 - posterMask), 0.0, 1.0);
-    float pOnly = clamp(posterMask * (1.0 - lineMask), 0.0, 1.0);
-    col = u_bgColor * (1.0 - lOnly - pOnly) + u_lineColor * lOnly + u_posterColor * pOnly;
+    // Snap masks to binary for clean XOR cutout (no blending between colors)
+    float lBin = step(0.5, lineMask);
+    float pBin = step(0.5, posterMask);
+    float lOnly = lBin * (1.0 - pBin);
+    float pOnly = pBin * (1.0 - lBin);
+    // Anti-alias edges using original smooth masks for alpha
+    float edgeAA = clamp(lineMask + posterMask, 0.0, 1.0);
+    vec3 solidCol = u_bgColor;
+    if (lOnly > 0.5) solidCol = u_lineColor;
+    else if (pOnly > 0.5) solidCol = u_posterColor;
+    col = mix(u_bgColor, solidCol, edgeAA);
 
     // Vignette
     col *= 1.0 - u_vignette * dist * dist * 0.3;
@@ -1534,9 +1542,17 @@ void main() {
 
     // Composite with separate colors
     float lineMask = sceneMask + videoMask - 2.0 * sceneMask * videoMask;
-    float lOnly = clamp(lineMask * (1.0 - posterMask), 0.0, 1.0);
-    float pOnly = clamp(posterMask * (1.0 - lineMask), 0.0, 1.0);
-    col = u_bgColor * (1.0 - lOnly - pOnly) + u_lineColor * lOnly + u_posterColor * pOnly;
+    // Snap masks to binary for clean XOR cutout (no blending between colors)
+    float lBin = step(0.5, lineMask);
+    float pBin = step(0.5, posterMask);
+    float lOnly = lBin * (1.0 - pBin);
+    float pOnly = pBin * (1.0 - lBin);
+    // Anti-alias edges using original smooth masks for alpha
+    float edgeAA = clamp(lineMask + posterMask, 0.0, 1.0);
+    vec3 solidCol = u_bgColor;
+    if (lOnly > 0.5) solidCol = u_lineColor;
+    else if (pOnly > 0.5) solidCol = u_posterColor;
+    col = mix(u_bgColor, solidCol, edgeAA);
 
     // Grain
     float t1 = floor(u_time * 24.0);
