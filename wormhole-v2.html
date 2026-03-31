@@ -1444,7 +1444,14 @@ uniform float u_videoAspect;
 uniform float u_screenAspect;
 out vec4 fragColor;
 
-float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+// Integer-based hash — no sin() precision issues, no spatial correlation
+float hash(vec2 p) {
+  uvec2 q = uvec2(floatBitsToUint(p.x), floatBitsToUint(p.y));
+  uint n = q.x ^ (q.y * 747796405u);
+  n = ((n >> 16u) ^ n) * 2654435769u;
+  n = ((n >> 16u) ^ n) * 2654435769u;
+  return float(n) / 4294967295.0;
+}
 
 void main() {
   vec2 uv = v_uv;
@@ -2680,7 +2687,7 @@ function render(time, dt) {
   gl.uniform1f(compU.u_bloomIntensity, state.bloomIntensity);
   gl.uniform1f(compU.u_chromaticAberration, state.chromaticAberration);
   gl.uniform1f(compU.u_vignette, state.vignette);
-  gl.uniform1f(compU.u_grain, isMobile ? 0.0 : state.grain);
+  gl.uniform1f(compU.u_grain, isMobile ? state.grain * 0.5 : state.grain);
   gl.uniform1f(compU.u_grainScale, isMobile ? 3.0 : 1.0);
   gl.uniform1f(compU.u_time, state.time % 1000);
   gl.uniform3fv(compU.u_bgColor, state.bgColor);
