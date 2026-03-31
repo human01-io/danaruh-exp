@@ -1498,16 +1498,15 @@ void main() {
     // Where poster is active but lines aren't: poster color
     // Where both are active: cutout to bg
     // Where only lines: line color
-    // Snap masks to binary for clean XOR cutout (no blending between colors)
+    // Binary XOR cutout — branchless for consistent GPU behavior
     float lBin = step(0.5, lineMask);
     float pBin = step(0.5, posterMask);
     float lOnly = lBin * (1.0 - pBin);
     float pOnly = pBin * (1.0 - lBin);
-    // Anti-alias edges using original smooth masks for alpha
-    float edgeAA = clamp(lineMask + posterMask, 0.0, 1.0);
-    vec3 solidCol = u_bgColor;
-    if (lOnly > 0.5) solidCol = u_lineColor;
-    else if (pOnly > 0.5) solidCol = u_posterColor;
+    // Solid color: line, poster, or background (cutout)
+    vec3 solidCol = u_lineColor * lOnly + u_posterColor * pOnly + u_bgColor * (1.0 - lOnly - pOnly);
+    // Anti-alias edges
+    float edgeAA = clamp(max(lineMask, posterMask), 0.0, 1.0);
     col = mix(u_bgColor, solidCol, edgeAA);
 
     // Vignette
@@ -1542,16 +1541,15 @@ void main() {
 
     // Composite with separate colors
     float lineMask = sceneMask + videoMask - 2.0 * sceneMask * videoMask;
-    // Snap masks to binary for clean XOR cutout (no blending between colors)
+    // Binary XOR cutout — branchless for consistent GPU behavior
     float lBin = step(0.5, lineMask);
     float pBin = step(0.5, posterMask);
     float lOnly = lBin * (1.0 - pBin);
     float pOnly = pBin * (1.0 - lBin);
-    // Anti-alias edges using original smooth masks for alpha
-    float edgeAA = clamp(lineMask + posterMask, 0.0, 1.0);
-    vec3 solidCol = u_bgColor;
-    if (lOnly > 0.5) solidCol = u_lineColor;
-    else if (pOnly > 0.5) solidCol = u_posterColor;
+    // Solid color: line, poster, or background (cutout)
+    vec3 solidCol = u_lineColor * lOnly + u_posterColor * pOnly + u_bgColor * (1.0 - lOnly - pOnly);
+    // Anti-alias edges
+    float edgeAA = clamp(max(lineMask, posterMask), 0.0, 1.0);
     col = mix(u_bgColor, solidCol, edgeAA);
 
     // Grain
