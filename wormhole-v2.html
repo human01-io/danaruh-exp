@@ -1427,6 +1427,7 @@ uniform float u_bloomIntensity;
 uniform float u_chromaticAberration;
 uniform float u_vignette;
 uniform float u_grain;
+uniform float u_grainScale;
 uniform float u_time;
 uniform vec3 u_bgColor;
 uniform float u_masterOpacity;
@@ -1501,8 +1502,9 @@ void main() {
     float t1f = floor(u_time * 24.0);
     float t2f = t1f + 1.0;
     float tff = fract(u_time * 24.0);
-    float g1f = hash(gl_FragCoord.xy + mod(t1f, 100.0) * 7.23) - 0.5;
-    float g2f = hash(gl_FragCoord.xy + mod(t2f, 100.0) * 7.23) - 0.5;
+    vec2 grainCoord = floor(gl_FragCoord.xy / u_grainScale) * u_grainScale;
+    float g1f = hash(grainCoord + mod(t1f, 100.0) * 7.23) - 0.5;
+    float g2f = hash(grainCoord + mod(t2f, 100.0) * 7.23) - 0.5;
     col += mix(g1f, g2f, tff * tff * (3.0 - 2.0 * tff)) * u_grain;
 
     fragColor = vec4(col, 1.0);
@@ -1533,8 +1535,9 @@ void main() {
     float t1 = floor(u_time * 24.0);
     float t2 = t1 + 1.0;
     float tf = fract(u_time * 24.0);
-    float g1 = hash(gl_FragCoord.xy + mod(t1, 100.0) * 7.23) - 0.5;
-    float g2 = hash(gl_FragCoord.xy + mod(t2, 100.0) * 7.23) - 0.5;
+    vec2 grainCoord2 = floor(gl_FragCoord.xy / u_grainScale) * u_grainScale;
+    float g1 = hash(grainCoord2 + mod(t1, 100.0) * 7.23) - 0.5;
+    float g2 = hash(grainCoord2 + mod(t2, 100.0) * 7.23) - 0.5;
     float grainVal = mix(g1, g2, tf * tf * (3.0 - 2.0 * tf)) * u_grain;
     col += grainVal;
 
@@ -1569,7 +1572,7 @@ const particleProg = createProgram(particleVS, particleFS);
 const particleU = getUniforms(particleProg, 'u_mvp', 'u_color', 'u_pixelRatio');
 
 const compositeProg = createProgram(quadVS, compositeFS);
-const compU = getUniforms(compositeProg, 'u_scene', 'u_bloom', 'u_poster', 'u_video', 'u_bloomIntensity', 'u_chromaticAberration', 'u_vignette', 'u_grain', 'u_time', 'u_bgColor', 'u_lineColor', 'u_posterColor', 'u_masterOpacity', 'u_flatMode', 'u_posterReady', 'u_posterThreshold', 'u_posterAspect', 'u_videoReady', 'u_videoAspect', 'u_screenAspect');
+const compU = getUniforms(compositeProg, 'u_scene', 'u_bloom', 'u_poster', 'u_video', 'u_bloomIntensity', 'u_chromaticAberration', 'u_vignette', 'u_grain', 'u_grainScale', 'u_time', 'u_bgColor', 'u_lineColor', 'u_posterColor', 'u_masterOpacity', 'u_flatMode', 'u_posterReady', 'u_posterThreshold', 'u_posterAspect', 'u_videoReady', 'u_videoAspect', 'u_screenAspect');
 
 const blurProg = createProgram(quadVS, blurFS);
 const blurU = getUniforms(blurProg, 'u_tex', 'u_dir');
@@ -2677,7 +2680,8 @@ function render(time, dt) {
   gl.uniform1f(compU.u_bloomIntensity, state.bloomIntensity);
   gl.uniform1f(compU.u_chromaticAberration, state.chromaticAberration);
   gl.uniform1f(compU.u_vignette, state.vignette);
-  gl.uniform1f(compU.u_grain, state.grain);
+  gl.uniform1f(compU.u_grain, isMobile ? state.grain * 0.5 : state.grain);
+  gl.uniform1f(compU.u_grainScale, isMobile ? 3.0 : 1.0);
   gl.uniform1f(compU.u_time, state.time % 1000);
   gl.uniform3fv(compU.u_bgColor, state.bgColor);
   gl.uniform1f(compU.u_masterOpacity, state.masterOpacity);
@@ -2790,8 +2794,8 @@ canvas.addEventListener('touchmove', (e) => {
 }, { passive: true });
 
 // === PAGE LOAD SEQUENCE ===
-// Reduce grain on mobile for cleaner colors
-if (window.innerWidth < window.innerHeight) state.grain = Math.min(state.grain, 0.04);
+// On mobile, use coarser grain to avoid sub-pixel moiré
+const isMobile = window.innerWidth < window.innerHeight || 'ontouchstart' in window;
 // Start with wormhole invisible, then animate in over 2 seconds
 // introComplete is declared at top of script scope
 gsap.to(state, {
