@@ -867,7 +867,16 @@ const BUILTIN_PRESETS = {
 // === SETUP ===
 const canvas = document.getElementById('c');
 const gl = canvas.getContext('webgl2', { antialias: false, alpha: false });
-if (!gl) { document.body.innerHTML = '<p style="color:#fff;padding:2em;">WebGL2 required</p>'; throw 'no gl'; }
+if (!gl) {
+  document.body.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#0D1E21;color:#F07605;font-family:system-ui,sans-serif;text-align:center;padding:2em;">
+      <div>
+        <p style="font-size:1.5em;margin-bottom:0.5em;">Your browser doesn't support WebGL2</p>
+        <p style="color:#888;font-size:0.9em;">Try updating your browser or using a recent version of Chrome, Firefox, or Safari.</p>
+      </div>
+    </div>`;
+  throw 'no gl';
+}
 
 let introComplete = false;
 
