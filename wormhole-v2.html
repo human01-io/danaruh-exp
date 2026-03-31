@@ -8,8 +8,9 @@
   @font-face { font-family: 'VG5000'; src: url('assets/Fonts/VG5000-Regular_web.woff2') format('woff2'), url('assets/Fonts/VG5000-Regular_web.woff') format('woff'); }
   @font-face { font-family: 'Aeonik'; src: url('assets/Fonts/AeonikTRIAL-Medium.otf') format('opentype'); }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { overflow: hidden; background: #000; }
-  canvas { display: block; width: 100vw; height: 100vh; cursor: grab; }
+  html, body { overflow: hidden; width: 100%; height: 100%; position: fixed; top: 0; left: 0; }
+  body { background: #000; touch-action: none; overscroll-behavior: none; }
+  canvas { display: block; width: 100vw; height: 100dvh; height: 100vh; cursor: grab; }
   canvas:active { cursor: grabbing; }
 
   #controls {
@@ -1273,10 +1274,16 @@ for (const name of Object.keys(BUILTIN_PRESETS)) {
 // === RESIZE ===
 function resize() {
   const dpr = Math.min(window.devicePixelRatio, 2);
-  canvas.width = window.innerWidth * dpr;
-  canvas.height = window.innerHeight * dpr;
+  // Use visualViewport for accurate mobile sizing (avoids address bar issues)
+  const vw = window.visualViewport ? window.visualViewport.width : window.innerWidth;
+  const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  canvas.width = vw * dpr;
+  canvas.height = vh * dpr;
+  canvas.style.width = vw + 'px';
+  canvas.style.height = vh + 'px';
 }
 window.addEventListener('resize', resize);
+if (window.visualViewport) window.visualViewport.addEventListener('resize', resize);
 resize();
 
 // === SHADER UTILS ===
@@ -1885,9 +1892,13 @@ let videoTex = null;
 let videoReady = false;
 let videoAspect = 1;
 const overlayVideo = document.createElement('video');
-overlayVideo.src = 'assets/bg-bitmap.webm';
 overlayVideo.loop = true;
 overlayVideo.muted = true;
+overlayVideo.setAttribute('playsinline', '');
+overlayVideo.setAttribute('webkit-playsinline', '');
+// Use mp4 for iOS (no webm support), webm for others
+const canPlayWebm = overlayVideo.canPlayType('video/webm; codecs="vp9"');
+overlayVideo.src = canPlayWebm ? 'assets/bg-bitmap.webm' : 'assets/bg-bitmap.mp4';
 overlayVideo.playsInline = true;
 overlayVideo.addEventListener('loadeddata', () => {
   videoAspect = overlayVideo.videoWidth / overlayVideo.videoHeight;
@@ -1898,7 +1909,17 @@ overlayVideo.addEventListener('loadeddata', () => {
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   videoReady = true;
-  overlayVideo.play();
+  // Try autoplay; iOS may block it until user interaction
+  const tryPlay = () => overlayVideo.play().catch(() => {});
+  tryPlay();
+  // Retry on first touch/click for iOS
+  const startOnInteraction = () => {
+    tryPlay();
+    document.removeEventListener('touchstart', startOnInteraction);
+    document.removeEventListener('click', startOnInteraction);
+  };
+  document.addEventListener('touchstart', startOnInteraction, { once: true });
+  document.addEventListener('click', startOnInteraction, { once: true });
 });
 
 // === SVG SILHOUETTE LOADING ===
