@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Wormhole v2</title>
 <style>
+  @font-face { font-family: 'VG5000'; src: url('assets/Fonts/VG5000-Regular_web.woff2') format('woff2'), url('assets/Fonts/VG5000-Regular_web.woff') format('woff'); }
+  @font-face { font-family: 'Aeonik'; src: url('assets/Fonts/AeonikTRIAL-Medium.otf') format('opentype'); }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { overflow: hidden; background: #000; }
   canvas { display: block; width: 100vw; height: 100vh; cursor: grab; }
@@ -524,6 +526,13 @@
     <div class="group open">
       <div class="group-title">Colors</div>
       <div class="group-body">
+        <div class="row-inline" style="margin-bottom:8px;">
+          <label>Profile</label>
+          <select id="colorProfile" style="flex:1;background:#1a1a2a;border:1px solid #444;border-radius:4px;padding:2px 4px;font-family:inherit;font-size:10px;color:#ccc;cursor:pointer;">
+            <option value="custom">Custom</option>
+          </select>
+          <button id="colorProfileSave" style="margin-left:4px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:4px;padding:2px 6px;font-family:inherit;font-size:10px;color:#ccc;cursor:pointer;" title="Save current colors as profile">+</button>
+        </div>
         <div class="row-color">
           <label>Background</label>
           <input type="text" class="hex-input" id="bgColorHex" value="#05050F" spellcheck="false" maxlength="7">
@@ -533,6 +542,11 @@
           <label>Line color</label>
           <input type="text" class="hex-input" id="lineColorHex" value="#4DB3FF" spellcheck="false" maxlength="7">
           <input type="color" id="lineColor" value="#4db3ff">
+        </div>
+        <div class="row-color">
+          <label>Text color</label>
+          <input type="text" class="hex-input" id="posterColorHex" value="#F07605" spellcheck="false" maxlength="7">
+          <input type="color" id="posterColor" value="#f07605">
         </div>
       </div>
     </div>
@@ -631,6 +645,33 @@
     </div>
 
     <div class="group">
+      <div class="group-title">Poster Overlay</div>
+      <div class="group-body">
+        <div class="row">
+          <label>Blur</label>
+          <input type="range" id="posterBlur" min="0" max="0.02" step="0.0005" value="0.001">
+          <span class="val" id="posterBlurVal">0.0010</span>
+        </div>
+        <div class="row">
+          <label>Threshold</label>
+          <input type="range" id="posterThreshold" min="50" max="240" step="1" value="147">
+          <span class="val" id="posterThresholdVal">147</span>
+        </div>
+        <div class="row">
+          <label>Global scale</label>
+          <input type="range" id="posterScale" min="0.2" max="3" step="0.05" value="1">
+          <span class="val" id="posterScaleVal">1.00</span>
+        </div>
+        <div class="row-inline" style="margin-top:6px;">
+          <label>Edit layout</label>
+          <input type="checkbox" id="posterEditToggle">
+        </div>
+        <div id="posterElementControls" style="display:none;margin-top:6px;border-top:1px solid #333;padding-top:6px;"></div>
+        <button id="posterSaveLayout" style="width:100%;margin-top:6px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:4px;padding:4px 8px;font-family:inherit;font-size:10px;color:#ccc;cursor:pointer;">Save layout to console</button>
+      </div>
+    </div>
+
+    <div class="group">
       <div class="group-title">Geometry</div>
       <div class="group-body">
         <div class="row-inline">
@@ -723,7 +764,7 @@
   </div>
 </div>
 
-<div id="timeline">
+<div id="timeline" class="collapsed">
   <div id="tl-header">
     <button id="tl-play" title="Play/Pause">&#9654;</button>
     <button id="tl-stop" title="Stop">&#9632;</button>
@@ -756,7 +797,7 @@
     </select>
     <button id="tl-save" title="Save project to JSON file">Save</button>
     <button id="tl-load" title="Load project from JSON file">Load</button>
-    <button id="tl-toggle">&#9660;</button>
+    <button id="tl-toggle">&#9650;</button>
   </div>
   <div id="tl-body">
     <div id="tl-ruler-row" style="display:flex;align-items:center;gap:2px;">
@@ -869,6 +910,10 @@ const state = {
   masterOpacity: 0,  // 0=invisible, 1=fully visible
   panX: 0,
   panY: 0,
+  posterBlur: 0.001,
+  posterThreshold: 147,
+  posterScale: 1,
+  posterColor: [0.9412, 0.4627, 0.0196],
   // Shape morph blend: 0 = current shape, 1 = svgSilhouette
   shapeMorphBlend: 0,
 };
@@ -982,6 +1027,124 @@ bindRange('bloomIntensity', 'bloomIntensity', 2);
 bindRange('chromaticAberration', 'chromaticAberration', 3);
 bindRange('vignette', 'vignette', 2);
 bindRange('grain', 'grain', 3);
+// Poster overlay controls — re-render canvas on change
+['posterBlur', 'posterThreshold'].forEach(id => {
+  const input = document.getElementById(id);
+  const valEl = document.getElementById(id + 'Val');
+  if (!input) return;
+  input.addEventListener('input', () => {
+    state[id] = parseFloat(input.value);
+    if (valEl) valEl.textContent = id === 'posterBlur' ? state[id].toFixed(4) : state[id].toFixed(0);
+    if (posterReady || posterTex) renderPosterTexture();
+  });
+});
+
+// Poster text color
+bindColor('posterColor', 'posterColor');
+
+// === COLOR PROFILES ===
+const colorProfiles = [
+  { name: 'Light / Blue', bg: '#B3BFC1', line: '#F07605', text: '#3055E8' },
+  { name: 'Dark / Orange', bg: '#0D1E21', line: '#F07605', text: '#F07605' },
+  { name: 'Dark / Teal', bg: '#0E0907', line: '#94FFD1', text: '#94FFD1' },
+  { name: 'Midnight / Pink', bg: '#0A0010', line: '#FF4DA6', text: '#FF4DA6' },
+  { name: 'Deep Blue / Ice', bg: '#020206', line: '#4DB8FF', text: '#4DB8FF' },
+];
+const colorProfileSelect = document.getElementById('colorProfile');
+const colorProfileSaveBtn = document.getElementById('colorProfileSave');
+
+function rebuildProfileDropdown() {
+  colorProfileSelect.innerHTML = '<option value="custom">Custom</option>';
+  colorProfiles.forEach((p, i) => {
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = p.name;
+    colorProfileSelect.appendChild(opt);
+  });
+}
+rebuildProfileDropdown();
+
+function applyColorProfile(p) {
+  const rgb = (hex) => [parseInt(hex.slice(1,3),16)/255, parseInt(hex.slice(3,5),16)/255, parseInt(hex.slice(5,7),16)/255];
+  const setColor = (key, hex) => {
+    const c = rgb(hex);
+    state[key][0] = c[0]; state[key][1] = c[1]; state[key][2] = c[2];
+    const picker = document.getElementById(key);
+    const hexInput = document.getElementById(key + 'Hex');
+    if (picker) picker.value = hex;
+    if (hexInput) hexInput.value = hex.toUpperCase();
+  };
+  setColor('bgColor', p.bg);
+  setColor('lineColor', p.line);
+  setColor('posterColor', p.text);
+}
+
+colorProfileSelect.addEventListener('change', () => {
+  const val = colorProfileSelect.value;
+  if (val === 'custom') return;
+  applyColorProfile(colorProfiles[parseInt(val)]);
+});
+
+colorProfileSaveBtn.addEventListener('click', () => {
+  const toHex = (rgb) => '#' + rgb.map(c => Math.round(c*255).toString(16).padStart(2,'0')).join('');
+  const name = prompt('Profile name:');
+  if (!name) return;
+  colorProfiles.push({
+    name,
+    bg: toHex(state.bgColor),
+    line: toHex(state.lineColor),
+    text: toHex(state.posterColor),
+  });
+  rebuildProfileDropdown();
+  colorProfileSelect.value = colorProfiles.length - 1;
+});
+
+// Global poster scale
+document.getElementById('posterScale').addEventListener('input', (e) => {
+  state.posterScale = parseFloat(e.target.value);
+  document.getElementById('posterScaleVal').textContent = state.posterScale.toFixed(2);
+  renderPosterTexture();
+});
+
+// Build per-element size controls
+function buildElementControls() {
+  const container = document.getElementById('posterElementControls');
+  container.innerHTML = '';
+  for (const el of posterElements) {
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.innerHTML = `<label style="font-size:9px">${el.id}</label>
+      <input type="range" min="0.005" max="0.15" step="0.001" value="${el.size}" data-el-id="${el.id}">
+      <span class="val">${el.size.toFixed(3)}</span>`;
+    const input = row.querySelector('input');
+    const val = row.querySelector('.val');
+    input.addEventListener('input', () => {
+      el.size = parseFloat(input.value);
+      val.textContent = el.size.toFixed(3);
+      renderPosterTexture(true);
+    });
+    input.addEventListener('change', () => renderPosterTexture(false));
+    container.appendChild(row);
+  }
+}
+document.getElementById('posterEditToggle').addEventListener('change', (e) => {
+  posterEditMode = e.target.checked;
+  canvas.style.cursor = posterEditMode ? 'crosshair' : 'grab';
+  document.getElementById('posterElementControls').style.display = posterEditMode ? 'block' : 'none';
+  renderPosterTexture();
+});
+
+document.getElementById('posterSaveLayout').addEventListener('click', () => {
+  const layout = posterElements.map(el => ({ id: el.id, x: +el.x.toFixed(4), y: +el.y.toFixed(4), size: +el.size.toFixed(4) }));
+  console.log('Poster layout:', JSON.stringify(layout, null, 2));
+  // Copy to clipboard
+  navigator.clipboard.writeText(JSON.stringify(layout, null, 2)).then(() => {
+    const btn = document.getElementById('posterSaveLayout');
+    btn.textContent = 'Copied to clipboard!';
+    setTimeout(() => { btn.textContent = 'Save layout to console'; }, 2000);
+  });
+});
+
 bindRange('throatRadius', 'throatRadius', 2);
 bindRange('throatScale', 'throatScale', 2);
 bindRange('funnelExtent', 'funnelExtent', 1);
@@ -1261,9 +1424,13 @@ uniform vec3 u_bgColor;
 uniform float u_masterOpacity;
 uniform float u_flatMode;
 uniform sampler2D u_poster;
+uniform sampler2D u_video;
 uniform vec3 u_lineColor;
+uniform vec3 u_posterColor;
 uniform float u_posterReady;
 uniform float u_posterAspect;
+uniform float u_videoReady;
+uniform float u_videoAspect;
 uniform float u_screenAspect;
 out vec4 fragColor;
 
@@ -1276,32 +1443,50 @@ void main() {
 
   // Sample scene
   vec3 scene;
-  if (u_flatMode > 0.5) {
-    // Flat mode: no chromatic aberration, no bloom, no tone mapping
-    vec4 sceneRGBA = texture(u_scene, uv);
-    // Use alpha channel to blend lines over background
-    float a = min(sceneRGBA.a * u_masterOpacity, 1.0);
-    vec3 lineCol = sceneRGBA.rgb / max(sceneRGBA.a, 0.001); // unpremultiply
-    vec3 col = mix(u_bgColor, lineCol, a);
+  // Collect overlay masks
+  float videoMask = 0.0;
+  if (u_videoReady > 0.5) {
+    vec2 vuv = uv;
+    // Cover: fill screen, crop edges
+    float vRatio = u_screenAspect / u_videoAspect;
+    if (vRatio > 1.0) { vuv.y = (vuv.y - 0.5) / vRatio + 0.5; }
+    else { vuv.x = (vuv.x - 0.5) * vRatio + 0.5; }
+    vuv = clamp(vuv, 0.0, 1.0);
+    {
+      vec4 vid = texture(u_video, vuv);
+      float vgray = dot(vid.rgb, vec3(0.299, 0.587, 0.114));
+      videoMask = smoothstep(0.45, 0.35, vgray);
+    }
+  }
 
-    // Vignette (subtle on light bg)
+  float posterMask = 0.0;
+  if (u_posterReady > 0.5) {
+    vec4 poster = texture(u_poster, uv);
+    float gray = dot(poster.rgb, vec3(0.299, 0.587, 0.114));
+    posterMask = smoothstep(0.45, 0.35, gray);
+  }
+
+  if (u_flatMode > 0.5) {
+    vec4 sceneRGBA = texture(u_scene, uv);
+    float sceneMask = min(sceneRGBA.a * u_masterOpacity, 1.0);
+
+    // XOR between scene and video (both use lineColor)
+    float lineMask = sceneMask + videoMask - 2.0 * sceneMask * videoMask;
+    // Start with line color layer
+    vec3 col = mix(u_bgColor, u_lineColor, clamp(lineMask, 0.0, 1.0));
+    // Poster on top with its own color — XOR cutout with existing
+    float combined = lineMask + posterMask - 2.0 * lineMask * posterMask;
+    // Where poster is active but lines aren't: poster color
+    // Where both are active: cutout to bg
+    // Where only lines: line color
+    float lOnly = clamp(lineMask * (1.0 - posterMask), 0.0, 1.0);
+    float pOnly = clamp(posterMask * (1.0 - lineMask), 0.0, 1.0);
+    col = u_bgColor * (1.0 - lOnly - pOnly) + u_lineColor * lOnly + u_posterColor * pOnly;
+
+    // Vignette
     col *= 1.0 - u_vignette * dist * dist * 0.3;
 
-    // Poster overlay
-    if (u_posterReady > 0.5) {
-      vec2 puv = uv;
-      float scaleRatio = u_screenAspect / u_posterAspect;
-      if (scaleRatio > 1.0) { puv.x = (puv.x - 0.5) * scaleRatio + 0.5; }
-      else { puv.y = (puv.y - 0.5) / scaleRatio + 0.5; }
-      if (puv.x >= 0.0 && puv.x <= 1.0 && puv.y >= 0.0 && puv.y <= 1.0) {
-        vec4 poster = texture(u_poster, puv);
-        float gray = dot(poster.rgb, vec3(0.299, 0.587, 0.114));
-        float mask = smoothstep(0.45, 0.35, gray);
-        col = mix(col, u_lineColor, mask);
-      }
-    }
-
-    // Grain after poster
+    // Grain
     float t1f = floor(u_time * 24.0);
     float t2f = t1f + 1.0;
     float tff = fract(u_time * 24.0);
@@ -1311,7 +1496,6 @@ void main() {
 
     fragColor = vec4(col, 1.0);
   } else {
-    // Glow mode: full post-processing pipeline
     float ca = u_chromaticAberration * dist;
     float r = texture(u_scene, uv + center * ca).r;
     float g = texture(u_scene, uv).g;
@@ -1321,29 +1505,20 @@ void main() {
     vec3 bloom = texture(u_bloom, uv).rgb;
     col += bloom * u_bloomIntensity;
 
+    float sceneMask = min(length(col) * u_masterOpacity, 1.0);
+
     col *= u_masterOpacity;
-
     col += u_bgColor * (1.0 - min(1.0, (col.r + col.g + col.b) * 2.0));
-
     col *= 1.0 - u_vignette * dist * dist;
-
     col = 1.0 - exp(-col * 2.0);
 
-    // Poster overlay
-    if (u_posterReady > 0.5) {
-      vec2 puv = uv;
-      float scaleRatio = u_screenAspect / u_posterAspect;
-      if (scaleRatio > 1.0) { puv.x = (puv.x - 0.5) * scaleRatio + 0.5; }
-      else { puv.y = (puv.y - 0.5) / scaleRatio + 0.5; }
-      if (puv.x >= 0.0 && puv.x <= 1.0 && puv.y >= 0.0 && puv.y <= 1.0) {
-        vec4 poster = texture(u_poster, puv);
-        float gray = dot(poster.rgb, vec3(0.299, 0.587, 0.114));
-        float mask = smoothstep(0.45, 0.35, gray);
-        col = mix(col, u_lineColor, mask);
-      }
-    }
+    // Composite with separate colors
+    float lineMask = sceneMask + videoMask - 2.0 * sceneMask * videoMask;
+    float lOnly = clamp(lineMask * (1.0 - posterMask), 0.0, 1.0);
+    float pOnly = clamp(posterMask * (1.0 - lineMask), 0.0, 1.0);
+    col = u_bgColor * (1.0 - lOnly - pOnly) + u_lineColor * lOnly + u_posterColor * pOnly;
 
-    // Grain after poster
+    // Grain
     float t1 = floor(u_time * 24.0);
     float t2 = t1 + 1.0;
     float tf = fract(u_time * 24.0);
@@ -1383,7 +1558,7 @@ const particleProg = createProgram(particleVS, particleFS);
 const particleU = getUniforms(particleProg, 'u_mvp', 'u_color', 'u_pixelRatio');
 
 const compositeProg = createProgram(quadVS, compositeFS);
-const compU = getUniforms(compositeProg, 'u_scene', 'u_bloom', 'u_poster', 'u_bloomIntensity', 'u_chromaticAberration', 'u_vignette', 'u_grain', 'u_time', 'u_bgColor', 'u_lineColor', 'u_masterOpacity', 'u_flatMode', 'u_posterReady', 'u_posterAspect', 'u_screenAspect');
+const compU = getUniforms(compositeProg, 'u_scene', 'u_bloom', 'u_poster', 'u_video', 'u_bloomIntensity', 'u_chromaticAberration', 'u_vignette', 'u_grain', 'u_time', 'u_bgColor', 'u_lineColor', 'u_posterColor', 'u_masterOpacity', 'u_flatMode', 'u_posterReady', 'u_posterAspect', 'u_videoReady', 'u_videoAspect', 'u_screenAspect');
 
 const blurProg = createProgram(quadVS, blurFS);
 const blurU = getUniforms(blurProg, 'u_tex', 'u_dir');
@@ -1421,27 +1596,310 @@ const quadBuf = gl.createBuffer();
 gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf);
 gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
 
-// === POSTER TEXTURE ===
+// === DYNAMIC POSTER TEXTURE ===
 let posterTex = null;
 let posterReady = false;
 let posterAspect = 1;
-{
-  const img = new Image();
-  img.onload = () => {
-    posterAspect = img.width / img.height;
+const posterCanvas = document.createElement('canvas');
+const posterCtx = posterCanvas.getContext('2d', { willReadFrequently: true });
+// Load RA logo for bottom line
+const raLogo = new Image();
+raLogo.src = 'assets/ra-logo.png';
+// Load RE logo
+const reLogo = new Image();
+reLogo.src = 'assets/re-logo.svg';
+
+// Text elements: positions stored as % of canvas (0-1), sizes as % of height
+const posterElements = [
+  { id: 'dana',     text: 'DANA',     font: 'VG5000', size: 0.118, x: 0.1032, y: 0.2252, align: 'left', group: 'headliner' },
+  { id: 'berlin',   text: '(BERLIN)', font: 'Aeonik', size: 0.018, x: 0.1044, y: 0.2475, align: 'left', group: 'headliner' },
+  { id: 'ruh',      text: 'RUH',      font: 'VG5000', size: 0.118, x: 0.2576, y: 0.2995, align: 'left', group: 'headliner' },
+  { id: 'brouquade',text: '(BROUQUADE, KMA60)', font: 'Aeonik', size: 0.018, x: 0.26, y: 0.3229, align: 'left', group: 'headliner' },
+  { id: 'zepha',    text: 'ZEPHA',    font: 'VG5000', size: 0.119, x: 0.4406, y: 0.5431, align: 'left', group: 'zepha' },
+  { id: 'diewell',  text: '(DIE WELL)', font: 'Aeonik', size: 0.02, x: 0.5961, y: 0.5621, align: 'left', group: 'zepha' },
+  { id: 'lostkidd', text: 'LOST KIDD', font: 'VG5000', size: 0.051, x: 0.9512, y: 0.7013, align: 'right', group: 'support' },
+  { id: 'sotres',   text: '+ SOTRES', font: 'VG5000', size: 0.052, x: 0.9506, y: 0.7447, align: 'right', group: 'support' },
+  { id: 'ritmo',    text: '(RITMO ENIGMA)', font: 'Aeonik', size: 0.019, x: 0.95, y: 0.7659, align: 'right', group: 'support' },
+  { id: 'abril',    text: 'ABRIL 11', font: 'VG5000', size: 0.075, x: 0.1027, y: 0.8825, align: 'left', group: 'info' },
+  { id: 'radio',    text: 'RADIO28', font: 'VG5000', size: 0.075, x: 0.2593, y: 0.9307, align: 'left', group: 'info' },
+  { id: 'entradas', text: 'ENTRADAS POR RESIDENT ADVISOR', font: 'Aeonik', size: 0.027, x: 0.95, y: 0.98, align: 'right' },
+];
+
+// Bounding boxes for hit detection (populated during render)
+let posterBBoxes = [];
+let posterEditMode = false;
+let posterGapCenter = 0.4;
+buildElementControls();
+let posterDragIdx = -1;
+let posterDragOffX = 0, posterDragOffY = 0;
+
+function renderPosterTexture(fastMode) {
+  const w = canvas.width, h = canvas.height;
+  posterCanvas.width = w;
+  posterCanvas.height = h;
+  posterAspect = w / h;
+  const ctx = posterCtx;
+
+  // White background (transparent in shader)
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, w, h);
+
+  // Skip blur during drag for performance
+  if (!fastMode) {
+    const s = Math.sqrt(w * h);
+    const blurAmount = Math.max(0.5, s * state.posterBlur);
+    ctx.filter = `blur(${blurAmount}px)`;
+  }
+  ctx.fillStyle = '#000';
+
+  posterBBoxes = [];
+
+  const gScale = state.posterScale;
+  const base = Math.sqrt(w * h);
+  // Design aspect ratio — the ratio at which positions were set
+  const REF_ASPECT = 16 / 9;
+  // On portrait screens, shift layout up to use top space
+  const isPortrait = h > w;
+  const yBase = isPortrait ? h * 1.05 : h;
+  const yOff = isPortrait ? -h * 0.1 : 0;
+  // Find group anchors (first element in each group)
+  const groupAnchors = {};
+  for (const el of posterElements) {
+    if (el.group && !groupAnchors[el.group]) groupAnchors[el.group] = el;
+  }
+
+  for (const el of posterElements) {
+    const fontSize = base * el.size * gScale;
+    ctx.font = `${fontSize}px ${el.font}`;
+    ctx.textAlign = el.align;
+    ctx.textBaseline = 'alphabetic';
+
+    let px, py;
+    if (el.group) {
+      const anchor = groupAnchors[el.group];
+      // Anchor positions — x scales with width, y uses compressed base on portrait
+      const ax = w * anchor.x;
+      const ay = yOff + yBase * anchor.y;
+      // Offsets from anchor scale uniformly with base
+      const dx = REF_ASPECT * (el.x - anchor.x) * base;
+      const dy = (el.y - anchor.y) * base;
+      px = ax + dx;
+      py = ay + dy;
+    } else {
+      px = w * el.x;
+      py = yOff + yBase * el.y;
+    }
+    ctx.fillText(el.text, px, py);
+
+    // Compute bounding box for hit detection
+    const metrics = ctx.measureText(el.text);
+    let bx;
+    if (el.align === 'right') bx = px - metrics.width;
+    else if (el.align === 'center') bx = px - metrics.width / 2;
+    else bx = px;
+    posterBBoxes.push({
+      x: bx, y: py - fontSize * 0.85,
+      w: metrics.width, h: fontSize * 1.1,
+      elIdx: posterBBoxes.length
+    });
+  }
+
+  // RA logo next to "ENTRADAS..."
+  if (raLogo.complete && raLogo.naturalWidth) {
+    const entEl = posterElements.find(e => e.id === 'entradas');
+    const fontSize = Math.sqrt(w * h) * entEl.size * gScale;
+    ctx.font = `${fontSize}px ${entEl.font}`;
+    const textW = ctx.measureText(entEl.text).width;
+    const logoH = fontSize * 1.2;
+    const logoW = logoH * (raLogo.naturalWidth / raLogo.naturalHeight);
+    // Right-aligned: text ends at entEl.x, logo goes before the text
+    const textStartX = w * entEl.x - textW;
+    const entY = yOff + yBase * entEl.y;
+    ctx.drawImage(raLogo, textStartX - logoW - fontSize * 0.3, entY - logoH * 0.8, logoW, logoH);
+  }
+
+  // RE logo — centered on screen Y, left X
+  if (reLogo.complete && reLogo.naturalWidth) {
+    const logoSize = base * 0.12 * gScale;
+    const logoAspect = reLogo.naturalWidth / reLogo.naturalHeight;
+    const logoW = logoSize * logoAspect;
+    const logoH = logoSize;
+    const logoX = w * 0.05;
+    const logoY = h * 0.5 - logoH / 2;
+    ctx.drawImage(reLogo, logoX, logoY, logoW, logoH);
+  }
+
+  // Reset filter
+  ctx.filter = 'none';
+
+  // Threshold (skip in fast mode)
+  if (!fastMode) {
+    const imgData = ctx.getImageData(0, 0, w, h);
+    const d = imgData.data;
+    const threshold = state.posterThreshold;
+    for (let i = 0; i < d.length; i += 4) {
+      const gray = d[i] * 0.299 + d[i+1] * 0.587 + d[i+2] * 0.114;
+      const val = gray < threshold ? 0 : 255;
+      d[i] = d[i+1] = d[i+2] = val;
+    }
+    ctx.putImageData(imgData, 0, 0);
+  }
+
+  // Draw edit-mode bounding boxes on top (after threshold, won't affect texture much)
+  if (posterEditMode) {
+    ctx.filter = 'none';
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([4, 4]);
+    for (const bb of posterBBoxes) {
+      ctx.strokeRect(bb.x, bb.y, bb.w, bb.h);
+    }
+    ctx.setLineDash([]);
+  }
+
+  // Upload to WebGL
+  if (!posterTex) {
     posterTex = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, posterTex);
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    posterReady = true;
-  };
-  img.src = 'assets/dana ruh-TEXT 2.png';
+  } else {
+    gl.bindTexture(gl.TEXTURE_2D, posterTex);
+  }
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, posterCanvas);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+  posterReady = true;
+
+  // Find largest vertical gap between text bounding boxes for wormhole placement
+  if (isPortrait && posterBBoxes.length > 0) {
+    // Collect all occupied vertical bands
+    const bands = posterBBoxes.map(bb => ({ top: bb.y, bottom: bb.y + bb.h }));
+    bands.sort((a, b) => a.top - b.top);
+    // Merge overlapping bands
+    const merged = [bands[0]];
+    for (let i = 1; i < bands.length; i++) {
+      const prev = merged[merged.length - 1];
+      if (bands[i].top <= prev.bottom) {
+        prev.bottom = Math.max(prev.bottom, bands[i].bottom);
+      } else {
+        merged.push({ top: bands[i].top, bottom: bands[i].bottom });
+      }
+    }
+    // Find largest gap
+    let bestGap = 0, bestCenter = h * 0.4;
+    // Gap from top
+    if (merged[0].top > bestGap) { bestGap = merged[0].top; bestCenter = merged[0].top / 2; }
+    // Gaps between bands
+    for (let i = 1; i < merged.length; i++) {
+      const gap = merged[i].top - merged[i - 1].bottom;
+      if (gap > bestGap) {
+        bestGap = gap;
+        bestCenter = (merged[i - 1].bottom + merged[i].top) / 2;
+      }
+    }
+    // Gap from bottom
+    const bottomGap = h - merged[merged.length - 1].bottom;
+    if (bottomGap > bestGap) { bestGap = bottomGap; bestCenter = (merged[merged.length - 1].bottom + h) / 2; }
+    // Store as normalized 0-1
+    posterGapCenter = bestCenter / h;
+  } else {
+    posterGapCenter = 0.5;
+  }
 }
+
+// --- Poster drag interaction ---
+function posterHitTest(mx, my) {
+  const dpr = Math.min(window.devicePixelRatio, 2);
+  const px = mx * dpr, py = my * dpr;
+  // Check in reverse order (topmost first)
+  for (let i = posterBBoxes.length - 1; i >= 0; i--) {
+    const bb = posterBBoxes[i];
+    if (px >= bb.x && px <= bb.x + bb.w && py >= bb.y && py <= bb.y + bb.h) return i;
+  }
+  return -1;
+}
+
+canvas.addEventListener('mousedown', e => {
+  if (!posterEditMode) return;
+  const idx = posterHitTest(e.clientX, e.clientY);
+  if (idx >= 0) {
+    posterDragIdx = idx;
+    const dpr = Math.min(window.devicePixelRatio, 2);
+    posterDragOffX = e.clientX * dpr - canvas.width * posterElements[idx].x;
+    posterDragOffY = e.clientY * dpr - canvas.height * posterElements[idx].y;
+    e.stopPropagation();
+    e.preventDefault();
+  }
+}, true);
+
+window.addEventListener('mousemove', e => {
+  if (posterDragIdx < 0) return;
+  const dpr = Math.min(window.devicePixelRatio, 2);
+  const el = posterElements[posterDragIdx];
+  const newX = (e.clientX * dpr - posterDragOffX) / canvas.width;
+  const newY = (e.clientY * dpr - posterDragOffY) / canvas.height;
+  const dx = newX - el.x;
+  const dy = newY - el.y;
+  // Shift+drag = move whole group, normal drag = move single element
+  if (e.shiftKey && el.group) {
+    for (const other of posterElements) {
+      if (other.group === el.group) {
+        other.x += dx;
+        other.y += dy;
+      }
+    }
+  } else {
+    el.x = newX;
+    el.y = newY;
+  }
+  renderPosterTexture(true);
+});
+
+window.addEventListener('mouseup', () => {
+  if (posterDragIdx >= 0) {
+    posterDragIdx = -1;
+    renderPosterTexture(false);
+  }
+  posterDragIdx = -1;
+});
+
+// Explicitly load fonts, then render poster
+Promise.all([
+  new FontFace('VG5000', "url('assets/Fonts/VG5000-Regular_web.woff2') format('woff2'), url('assets/Fonts/VG5000-Regular_web.woff') format('woff')").load().then(f => document.fonts.add(f)),
+  new FontFace('Aeonik', "url('assets/Fonts/AeonikTRIAL-Medium.otf') format('opentype')").load().then(f => document.fonts.add(f)),
+]).then(() => {
+  renderPosterTexture();
+  let posterResizeTimer;
+  window.addEventListener('resize', () => {
+    renderPosterTexture(true);
+    clearTimeout(posterResizeTimer);
+    posterResizeTimer = setTimeout(() => renderPosterTexture(false), 200);
+  });
+}).catch(e => console.error('Font load failed:', e));
+
+// === VIDEO OVERLAY TEXTURE ===
+let videoTex = null;
+let videoReady = false;
+let videoAspect = 1;
+const overlayVideo = document.createElement('video');
+overlayVideo.src = 'assets/bg-bitmap.webm';
+overlayVideo.loop = true;
+overlayVideo.muted = true;
+overlayVideo.playsInline = true;
+overlayVideo.addEventListener('loadeddata', () => {
+  videoAspect = overlayVideo.videoWidth / overlayVideo.videoHeight;
+  videoTex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, videoTex);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  videoReady = true;
+  overlayVideo.play();
+});
 
 // === SVG SILHOUETTE LOADING ===
 let svgSilhouetteShape = null;
@@ -1955,6 +2413,7 @@ const quickRotX = gsap.quickTo(state, 'rotX', { duration: 0.05, ease: 'none' });
 const quickRotY = gsap.quickTo(state, 'rotY', { duration: 0.05, ease: 'none' });
 
 canvas.addEventListener('mousedown', e => {
+  if (posterEditMode) return;
   isDragging = true;
   lastMX = e.clientX;
   lastMY = e.clientY;
@@ -2030,9 +2489,22 @@ function render(time, dt) {
   const dpr = Math.min(window.devicePixelRatio, 2);
 
   // Build MVP matrix (incorporating masterScale for scroll/intro animations)
-  const sc = Math.max(state.masterScale, 0.001);
+  const sc = Math.max(state.masterScale * (aspect < 1 ? 0.5 : 1), 0.001);
   const proj = mat4Perspective(0.8, aspect, 0.1, 100);
-  const view = mat4Translate(state.panX, state.panY, state.cameraZ);
+  // Scale pan by aspect ratio so it looks consistent across screen sizes
+  const refAspect = 16 / 9;
+  const aspectScale = aspect / refAspect;
+  let viewPanX = state.panX * aspectScale;
+  let viewPanY = state.panY * aspectScale;
+  // On portrait, reposition wormhole into the largest gap between text
+  if (aspect < 1) {
+    const fov = 0.8;
+    const gapNDC = -(posterGapCenter * 2 - 1); // screen 0-1 to NDC (-1 to 1), flipped
+    const visibleH = 2 * Math.abs(state.cameraZ) * Math.tan(fov / 2);
+    viewPanX = 0;
+    viewPanY = gapNDC * visibleH * 0.5;
+  }
+  const view = mat4Translate(viewPanX, viewPanY, state.cameraZ);
   const rotX = mat4RotX(state.rotX);
   const rotY = mat4RotY(state.rotY);
   const scaleM = new Float32Array([sc,0,0,0, 0,sc,0,0, 0,0,sc,0, 0,0,0,1]);
@@ -2143,6 +2615,7 @@ function render(time, dt) {
   gl.uniform1f(compU.u_masterOpacity, state.masterOpacity);
   gl.uniform1f(compU.u_flatMode, state.flatMode ? 1.0 : 0.0);
   gl.uniform3fv(compU.u_lineColor, state.lineColor);
+  gl.uniform3fv(compU.u_posterColor, state.posterColor);
   gl.uniform1f(compU.u_posterReady, posterReady ? 1.0 : 0.0);
   gl.uniform1f(compU.u_posterAspect, posterAspect);
   gl.uniform1f(compU.u_screenAspect, canvas.width / canvas.height);
@@ -2150,6 +2623,18 @@ function render(time, dt) {
     gl.activeTexture(gl.TEXTURE2);
     gl.bindTexture(gl.TEXTURE_2D, posterTex);
     gl.uniform1i(compU.u_poster, 2);
+  }
+  gl.uniform1f(compU.u_videoReady, videoReady ? 1.0 : 0.0);
+  gl.uniform1f(compU.u_videoAspect, videoAspect);
+  if (videoReady) {
+    gl.activeTexture(gl.TEXTURE3);
+    gl.bindTexture(gl.TEXTURE_2D, videoTex);
+    if (!overlayVideo.paused && overlayVideo.readyState >= 2) {
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, overlayVideo);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    }
+    gl.uniform1i(compU.u_video, 3);
   }
   drawQuad();
 }
@@ -2367,6 +2852,7 @@ const TL_REGISTRY = {
   // Colors
   bgColor:     { label: 'Background',   group: 'Colors',   type: 'color' },
   lineColor:   { label: 'Line color',   group: 'Colors',   type: 'color' },
+  posterColor: { label: 'Text color',   group: 'Colors',   type: 'color' },
   // Lines
   ringWidth:   { label: 'Ring thick.',   group: 'Lines',    type: 'number' },
   meridianWidth:{ label: 'Merid. thick.',group: 'Lines',    type: 'number' },
@@ -3193,7 +3679,7 @@ requestAnimationFrame(() => {
 
 // === AUTO-LOAD DEFAULT PROJECT ===
 {
-  const project = {"version":1,"duration":30,"ease":"none","loopMode":"yoyo","activeTracks":["rotY","rotX","cameraZ","panX","panY"],"keyframes":{"rotX":[{"time":0,"value":5.43},{"time":30,"value":5.095}],"rotY":[{"time":0,"value":6.745},{"time":30,"value":10.335}],"cameraZ":[{"time":0,"value":-14.02},{"time":30,"value":-14.02}],"panX":[{"time":0,"value":-2.11},{"time":30,"value":-2.11}],"panY":[{"time":0,"value":-0.36},{"time":30,"value":-0.36}]},"state":{"rotX":5.43,"rotY":6.745,"cameraZ":-14.02,"panX":-2.11,"panY":-0.36,"bgColor":[0.051,0.118,0.129],"lineColor":[0.9412,0.4627,0.0196],"ringWidth":5.3,"meridianWidth":0.3,"ringAlpha":1,"meridianAlpha":0,"glowIntensity":0,"glowFalloff":4.7,"flowSpeed":0.09,"flowDir":-1,"ringCount":37,"bloomIntensity":0,"chromaticAberration":0,"vignette":0,"grain":0.1,"flatMode":true,"ringShape":"circle","shapeRotation":0,"throatRadius":1,"throatScale":1.1,"funnelExtent":1.1,"discWidth":1,"meridians":48,"particleCount":0}};
+  const project = {"version":1,"duration":30,"ease":"bounce.out","loopMode":"yoyo","activeTracks":["rotY","rotX","cameraZ","panX","panY"],"keyframes":{"rotY":[{"time":0,"value":6.745},{"time":30,"value":10.335}],"rotX":[{"time":0,"value":5.43},{"time":30,"value":5.095}],"cameraZ":[{"time":0,"value":-20},{"time":30,"value":-20}],"panX":[{"time":0,"value":7.965},{"time":30,"value":8.41}],"panY":[{"time":0,"value":3.63},{"time":30,"value":4.235}]},"state":{"rotX":5.095,"rotY":10.335,"cameraZ":-20,"panX":8.41,"panY":4.235,"bgColor":[0.051,0.118,0.129],"lineColor":[0.9412,0.4627,0.0196],"ringWidth":5.3,"meridianWidth":0.3,"ringAlpha":1,"meridianAlpha":0,"glowIntensity":0,"glowFalloff":4.7,"flowSpeed":0.09,"flowDir":-1,"ringCount":37,"bloomIntensity":0,"chromaticAberration":0,"vignette":0,"grain":0.1,"flatMode":true,"ringShape":"circle","shapeRotation":0,"throatRadius":1,"throatScale":1.1,"funnelExtent":1.1,"discWidth":1,"meridians":48,"particleCount":0}};
 
   // Restore duration, ease, loop mode
   TL.duration = project.duration;
@@ -3259,7 +3745,63 @@ requestAnimationFrame(() => {
   });
 }
 
-console.log('Wormhole v2 initialized. Programs:', !!lineProg, !!particleProg, !!compositeProg, !!blurProg);
+// === VIEW MODE & LIVE SYNC ===
+const isViewMode = new URLSearchParams(window.location.search).has('view');
+const syncChannel = new BroadcastChannel('wormhole-sync');
+
+if (isViewMode) {
+  // Hide all GUI
+  document.getElementById('controls').style.display = 'none';
+  document.getElementById('timeline').style.display = 'none';
+  canvas.style.cursor = 'default';
+
+  // Listen for state updates from master
+  syncChannel.onmessage = (e) => {
+    const msg = e.data;
+    if (msg.type === 'state') {
+      for (const [key, val] of Object.entries(msg.state)) {
+        if (Array.isArray(val) && Array.isArray(state[key])) {
+          state[key][0] = val[0]; state[key][1] = val[1]; state[key][2] = val[2];
+        } else if (key in state) {
+          state[key] = val;
+        }
+      }
+      state.targetRotX = state.rotX;
+      state.targetRotY = state.rotY;
+    }
+    if (msg.type === 'posterElements' && msg.elements) {
+      msg.elements.forEach((update, i) => {
+        if (posterElements[i]) Object.assign(posterElements[i], update);
+      });
+      renderPosterTexture();
+    }
+  };
+} else {
+  // Master mode: broadcast state changes periodically
+  let lastSyncTime = 0;
+  gsap.ticker.add(() => {
+    const now = performance.now();
+    if (now - lastSyncTime < 100) return; // 10fps sync
+    lastSyncTime = now;
+    const snapshot = {};
+    for (const key of Object.keys(state)) {
+      const val = state[key];
+      snapshot[key] = Array.isArray(val) ? val.slice() : val;
+    }
+    syncChannel.postMessage({ type: 'state', state: snapshot });
+  });
+
+  // Broadcast poster layout changes on save
+  const origSaveClick = document.getElementById('posterSaveLayout').onclick;
+  document.getElementById('posterSaveLayout').addEventListener('click', () => {
+    syncChannel.postMessage({
+      type: 'posterElements',
+      elements: posterElements.map(el => ({ x: el.x, y: el.y, size: el.size }))
+    });
+  });
+}
+
+console.log('Wormhole v2 initialized.', isViewMode ? '(view mode)' : '(master mode)');
 </script>
 </body>
 </html>
