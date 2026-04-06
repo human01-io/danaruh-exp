@@ -2332,7 +2332,7 @@ window.addEventListener('touchend', () => posterDragEnd());
 window.addEventListener('mouseup', () => posterDragEnd());
 
 // Explicitly load fonts, then render poster
-Promise.all([
+Promise.allSettled([
   new FontFace('VG5000', "url('assets/Fonts/VG5000-Regular_web.woff2') format('woff2'), url('assets/Fonts/VG5000-Regular_web.woff') format('woff')").load().then(f => document.fonts.add(f)),
   new FontFace('Aeonik', "url('assets/Fonts/AeonikTRIAL-Medium.otf') format('opentype')").load().then(f => document.fonts.add(f)),
   new FontFace('AeonikBlack', "url('assets/Fonts/AeonikTRIAL-Black.otf') format('opentype')").load().then(f => document.fonts.add(f)),
@@ -2347,7 +2347,7 @@ Promise.all([
     clearTimeout(posterResizeTimer);
     posterResizeTimer = setTimeout(() => renderPosterTexture(false), 200);
   });
-}).catch(e => console.error('Font load failed:', e));
+});
 
 // === VIDEO OVERLAY TEXTURE ===
 let videoTex = null;
