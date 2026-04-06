@@ -1,0 +1,3998 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shapes</title>
+<style>
+  @font-face { font-family: 'VG5000'; src: url('assets/Fonts/VG5000-Regular_web.woff2') format('woff2'), url('assets/Fonts/VG5000-Regular_web.woff') format('woff'); }
+  @font-face { font-family: 'Aeonik'; src: url('assets/Fonts/AeonikTRIAL-Medium.otf') format('opentype'); }
+  @font-face { font-family: 'AeonikBlack'; src: url('assets/Fonts/AeonikTRIAL-Black.otf') format('opentype'); }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { overflow: hidden; width: 100%; height: 100%; position: fixed; top: 0; left: 0; }
+  body { background: #000; touch-action: none; overscroll-behavior: none; }
+  canvas { display: block; width: 100vw; height: 100dvh; height: 100vh; cursor: grab; }
+  canvas:active { cursor: grabbing; }
+
+  #controls {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    width: 300px;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 11px;
+    color: #ccc;
+    z-index: 10;
+  }
+
+  #toggle {
+    background: rgba(20,20,30,0.85);
+    backdrop-filter: blur(8px);
+    border: 1px solid #444;
+    border-radius: 6px;
+    padding: 6px 12px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 11px;
+    color: #ccc;
+    float: right;
+    transition: background 0.15s;
+  }
+  #toggle:hover { background: rgba(40,40,60,1); }
+
+  #panel {
+    clear: both;
+    margin-top: 36px;
+    background: rgba(10,10,20,0.88);
+    backdrop-filter: blur(12px);
+    border: 1px solid #444;
+    border-radius: 8px;
+    padding: 10px 14px;
+    display: none;
+    max-height: calc(100vh - 80px);
+    overflow-y: auto;
+  }
+  #panel.open { display: block; }
+
+  .group {
+    margin-bottom: 6px;
+    border-bottom: 1px solid #282830;
+  }
+  .group:last-child { border-bottom: none; margin-bottom: 0; }
+
+  .group-title {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: #666;
+    padding: 8px 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    user-select: none;
+  }
+  .group-title:hover { color: #999; }
+  .group-title::after {
+    content: '\25B8';
+    font-size: 8px;
+    color: #555;
+    transition: transform 0.2s;
+  }
+  .group.open .group-title::after {
+    transform: rotate(90deg);
+  }
+
+  .group-body {
+    overflow: hidden;
+    height: 0;
+    opacity: 0;
+    padding-bottom: 0;
+  }
+  .group.open .group-body {
+    opacity: 1;
+    padding-bottom: 10px;
+  }
+
+  .row {
+    display: grid;
+    grid-template-columns: 100px 1fr 38px;
+    align-items: center;
+    gap: 0 8px;
+    margin-bottom: 7px;
+  }
+  .row:last-child { margin-bottom: 0; }
+
+  .row label {
+    color: #aaa;
+    font-size: 10.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .val {
+    text-align: right;
+    color: #555;
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .row input[type="range"] {
+    width: 100%;
+    height: 4px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: #333;
+    border-radius: 2px;
+    outline: none;
+  }
+  .row input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    background: #777;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .row input[type="range"]::-webkit-slider-thumb:hover,
+  .row input[type="range"]:active::-webkit-slider-thumb {
+    background: #bbb;
+  }
+
+  /* Color rows: label + hex input + swatch */
+  .row-color {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 7px;
+    gap: 6px;
+  }
+  .row-color label { color: #aaa; font-size: 10.5px; flex-shrink: 0; }
+
+  .row-color .hex-input {
+    flex: 1;
+    min-width: 0;
+    background: #1a1a2a;
+    border: 1px solid #444;
+    border-radius: 4px;
+    padding: 3px 6px;
+    font-family: inherit;
+    font-size: 11px;
+    color: #ccc;
+    text-align: right;
+    outline: none;
+    text-transform: uppercase;
+  }
+  .row-color .hex-input:focus {
+    border-color: #4db3ff;
+    color: #fff;
+  }
+
+  .row-color input[type="color"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 24px;
+    height: 20px;
+    border: 1px solid #555;
+    border-radius: 4px;
+    padding: 0;
+    cursor: pointer;
+    background: none;
+    flex-shrink: 0;
+  }
+  .row-color input[type="color"]::-webkit-color-swatch-wrapper { padding: 2px; }
+  .row-color input[type="color"]::-webkit-color-swatch { border: none; border-radius: 2px; }
+
+  /* Inline rows: label + widget (select, checkbox), no slider or val */
+  .row-inline {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 7px;
+  }
+  .row-inline label { color: #aaa; font-size: 10.5px; }
+
+  .row-inline select,
+  .row select {
+    background: #1a1a2a;
+    border: 1px solid #444;
+    border-radius: 4px;
+    padding: 3px 6px;
+    font-family: inherit;
+    font-size: 11px;
+    color: #ccc;
+    cursor: pointer;
+  }
+
+  .row-inline input[type="checkbox"],
+  .row input[type="checkbox"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 30px;
+    height: 15px;
+    border: 1px solid #555;
+    border-radius: 8px;
+    background: #1a1a2a;
+    cursor: pointer;
+    position: relative;
+    flex-shrink: 0;
+    transition: background 0.2s, border-color 0.2s;
+  }
+  .row-inline input[type="checkbox"]::after,
+  .row input[type="checkbox"]::after {
+    content: '';
+    position: absolute;
+    left: 2px; top: 2px;
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    background: #555;
+    transition: transform 0.2s, background 0.2s;
+  }
+  .row-inline input[type="checkbox"]:checked,
+  .row input[type="checkbox"]:checked {
+    background: rgba(77,179,255,0.25);
+    border-color: #4db3ff;
+  }
+  .row-inline input[type="checkbox"]:checked::after,
+  .row input[type="checkbox"]:checked::after {
+    transform: translateX(15px);
+    background: #4db3ff;
+    border: none;
+    width: 9px; height: 9px;
+    left: 2px; top: 2px;
+  }
+
+  /* Scrollbar styling */
+  #panel::-webkit-scrollbar { width: 4px; }
+  #panel::-webkit-scrollbar-track { background: transparent; }
+  #panel::-webkit-scrollbar-thumb { background: #444; border-radius: 2px; }
+
+
+
+  /* Swap buttons */
+  .swap-row {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    margin: -2px 0 2px;
+  }
+  .swap-btn {
+    background: none;
+    border: 1px solid #333;
+    border-radius: 3px;
+    padding: 1px 8px;
+    font-family: inherit;
+    font-size: 9px;
+    color: #555;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .swap-btn:hover { color: #aaa; border-color: #666; }
+
+  /* Shape bar */
+  #shapeBar {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #282830;
+  }
+  .shape-pill {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 4px;
+    padding: 3px 10px;
+    font-family: inherit;
+    font-size: 10px;
+    color: #888;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    min-width: 28px;
+    text-align: center;
+  }
+  .shape-pill:hover { background: rgba(255,255,255,0.15); }
+  .shape-pill.selected { background: rgba(77,179,255,0.25); border-color: #4db3ff; color: #4db3ff; }
+  .shape-pill.add { color: #4db3ff; border-color: rgba(77,179,255,0.3); }
+  .shape-pill.add:hover { background: rgba(77,179,255,0.15); }
+  .shape-pill.del { color: #ff6666; border-color: rgba(255,100,100,0.3); }
+  .shape-pill.del:hover { background: rgba(255,100,100,0.15); }
+
+</style>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mp4-muxer@5.1.3/build/mp4-muxer.min.js"></script>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="controls">
+  <button id="toggle">Controls</button>
+  <div id="panel">
+
+    <div id="shapeBar"></div>
+
+    <div class="group open">
+      <div class="group-title">Colors</div>
+      <div class="group-body">
+        <div class="row-inline" style="margin-bottom:8px;">
+          <label>Profile</label>
+          <select id="colorProfile" style="flex:1;background:#1a1a2a;border:1px solid #444;border-radius:4px;padding:2px 4px;font-family:inherit;font-size:10px;color:#ccc;cursor:pointer;">
+            <option value="custom">Custom</option>
+          </select>
+          <button id="colorProfileSave" style="margin-left:4px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:4px;padding:2px 6px;font-family:inherit;font-size:10px;color:#ccc;cursor:pointer;" title="Save current colors as profile">+</button>
+        </div>
+        <div class="row-inline" style="margin-bottom:8px;">
+          <label>Flash</label>
+          <div style="display:flex;gap:4px;align-items:center;">
+            <input type="range" id="flashSpeed" min="16" max="500" step="1" value="80" style="width:80px;">
+            <span class="val" id="flashSpeedVal" style="width:30px;">150</span>
+            <button id="flashBtn" style="background:rgba(255,80,80,0.15);border:1px solid rgba(255,80,80,0.4);border-radius:4px;padding:2px 8px;font-family:inherit;font-size:10px;color:#ff6666;cursor:pointer;">Go</button>
+          </div>
+        </div>
+        <div class="row-color">
+          <label>Background</label>
+          <input type="text" class="hex-input" id="bgColorHex" value="#B3BFC1" spellcheck="false" maxlength="7">
+          <input type="color" id="bgColor" value="#b3bfc1">
+        </div>
+        <div class="swap-row"><button class="swap-btn" data-swap="bgColor,lineColor" title="Swap BG &harr; Line">&harr;</button><button class="swap-btn" data-swap="bgColor,posterColor" title="Swap BG &harr; Text">BG&harr;Text</button></div>
+        <div class="row-color">
+          <label>Line color</label>
+          <input type="text" class="hex-input" id="lineColorHex" value="#F07605" spellcheck="false" maxlength="7">
+          <input type="color" id="lineColor" value="#f07605">
+        </div>
+        <div class="swap-row"><button class="swap-btn" data-swap="lineColor,posterColor" title="Swap Line &harr; Text">&harr;</button></div>
+        <div class="row-color">
+          <label>Text color</label>
+          <input type="text" class="hex-input" id="posterColorHex" value="#3055E8" spellcheck="false" maxlength="7">
+          <input type="color" id="posterColor" value="#3055e8">
+        </div>
+        <div class="swap-row"><button class="swap-btn" data-swap="posterColor,posterColor2" title="Swap Text &harr; Text2">&harr;</button></div>
+        <div class="row-color">
+          <label>Text color 2</label>
+          <input type="text" class="hex-input" id="posterColor2Hex" value="#3055E8" spellcheck="false" maxlength="7">
+          <input type="color" id="posterColor2" value="#3055e8">
+        </div>
+      </div>
+    </div>
+
+    <div class="group open">
+      <div class="group-title">Lines</div>
+      <div class="group-body">
+        <div class="row">
+          <label>Ring thick.</label>
+          <input type="range" id="ringWidth" min="0.3" max="6" step="0.1" value="5.3">
+          <span class="val" id="ringWidthVal">5.3</span>
+        </div>
+        <div class="row">
+          <label>Merid. thick.</label>
+          <input type="range" id="meridianWidth" min="0.3" max="4" step="0.1" value="0.3">
+          <span class="val" id="meridianWidthVal">0.3</span>
+        </div>
+        <div class="row">
+          <label>Ring opacity</label>
+          <input type="range" id="ringAlpha" min="0.1" max="1" step="0.05" value="1">
+          <span class="val" id="ringAlphaVal">1.00</span>
+        </div>
+        <div class="row">
+          <label>Merid. opacity</label>
+          <input type="range" id="meridianAlpha" min="0" max="1" step="0.05" value="0">
+          <span class="val" id="meridianAlphaVal">0.00</span>
+        </div>
+        <div class="row">
+          <label>Glow</label>
+          <input type="range" id="glowIntensity" min="0" max="4" step="0.1" value="0">
+          <span class="val" id="glowIntensityVal">0.0</span>
+        </div>
+        <div class="row">
+          <label>Glow falloff</label>
+          <input type="range" id="glowFalloff" min="0.5" max="10" step="0.1" value="4.7">
+          <span class="val" id="glowFalloffVal">4.7</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="group open">
+      <div class="group-title">Flow</div>
+      <div class="group-body">
+        <div class="row">
+          <label>Speed</label>
+          <input type="range" id="flowSpeed" min="0" max="0.5" step="0.01" value="0.09">
+          <span class="val" id="flowSpeedVal">0.09</span>
+        </div>
+        <div class="row-inline">
+          <label>Direction</label>
+          <select id="flowDir">
+            <option value="1">Forward</option>
+            <option value="-1" selected>Reverse</option>
+          </select>
+        </div>
+        <div class="row">
+          <label>Ring count</label>
+          <input type="range" id="ringCount" min="6" max="60" step="1" value="37">
+          <span class="val" id="ringCountVal">37</span>
+        </div>
+        <div class="row-inline">
+          <label>Breathing</label>
+          <input type="checkbox" id="breathingToggle">
+        </div>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-title">Post-Processing</div>
+      <div class="group-body">
+        <div class="row">
+          <label>Bloom</label>
+          <input type="range" id="bloomIntensity" min="0" max="2" step="0.05" value="0">
+          <span class="val" id="bloomIntensityVal">0.00</span>
+        </div>
+        <div class="row">
+          <label>Chromatic</label>
+          <input type="range" id="chromaticAberration" min="0" max="0.02" step="0.001" value="0">
+          <span class="val" id="chromaticAberrationVal">0.000</span>
+        </div>
+        <div class="row">
+          <label>Vignette</label>
+          <input type="range" id="vignette" min="0" max="1" step="0.05" value="0">
+          <span class="val" id="vignetteVal">0.00</span>
+        </div>
+        <div class="row">
+          <label>Grain</label>
+          <input type="range" id="grain" min="0" max="0.1" step="0.005" value="0.1">
+          <span class="val" id="grainVal">0.100</span>
+        </div>
+        <div class="row-inline">
+          <label>Flat mode</label>
+          <input type="checkbox" id="flatMode" checked>
+        </div>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-title">Poster</div>
+      <div class="group-body">
+        <div class="row">
+          <label>Blur</label>
+          <input type="range" id="posterBlur" min="0" max="0.02" step="0.0005" value="0.001">
+          <span class="val" id="posterBlurVal">0.0010</span>
+        </div>
+        <div class="row">
+          <label>Threshold</label>
+          <input type="range" id="posterThreshold" min="50" max="240" step="1" value="147">
+          <span class="val" id="posterThresholdVal">147</span>
+        </div>
+        <div class="row">
+          <label>Text scale</label>
+          <input type="range" id="posterScale" min="0.2" max="3" step="0.05" value="1">
+          <span class="val" id="posterScaleVal">1.00</span>
+        </div>
+        <div class="row">
+          <label>Reveal</label>
+          <input type="range" id="posterReveal" min="0" max="1" step="0.01" value="0">
+          <span class="val" id="posterRevealVal">0.00</span>
+        </div>
+        <div class="row">
+          <label>Reveal blur</label>
+          <input type="range" id="revealBlurMax" min="0" max="0.1" step="0.001" value="0.025">
+          <span class="val" id="revealBlurMaxVal">0.025</span>
+        </div>
+        <div class="row">
+          <label>Reveal thresh</label>
+          <input type="range" id="revealThreshStart" min="0.001" max="0.5" step="0.001" value="0.02">
+          <span class="val" id="revealThreshStartVal">0.020</span>
+        </div>
+        <div class="row">
+          <label>Reveal duration</label>
+          <input type="range" id="revealDuration" min="0.5" max="8" step="0.1" value="3">
+          <span class="val" id="revealDurationVal">3.0</span>
+        </div>
+        <div class="row">
+          <label>Reveal delay</label>
+          <input type="range" id="revealDelay" min="0" max="3" step="0.1" value="0.5">
+          <span class="val" id="revealDelayVal">0.5</span>
+        </div>
+        <button id="replayReveal" style="width:100%;margin-top:4px;margin-bottom:6px;background:rgba(77,179,255,0.12);border:1px solid rgba(77,179,255,0.35);border-radius:4px;padding:4px 8px;font-family:inherit;font-size:10px;color:#4db3ff;cursor:pointer;">Replay Reveal</button>
+        <div class="row-inline" style="margin-top:6px;">
+          <label>Edit layout</label>
+          <input type="checkbox" id="posterEditToggle">
+        </div>
+        <div id="posterElementControls" style="display:none;margin-top:6px;border-top:1px solid #333;padding-top:6px;"></div>
+        <button id="posterSaveLayout" style="width:100%;margin-top:6px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:4px;padding:4px 8px;font-family:inherit;font-size:10px;color:#ccc;cursor:pointer;">Save layout to console</button>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-title">Video</div>
+      <div class="group-body">
+        <div class="row">
+          <label>Scale</label>
+          <input type="range" id="videoScale" min="0.2" max="2" step="0.05" value="1">
+          <span class="val" id="videoScaleVal">1.00</span>
+        </div>
+        <div class="row-inline">
+          <label>Video 2</label>
+          <input type="checkbox" id="video2Toggle">
+        </div>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-title">Geometry</div>
+      <div class="group-body">
+        <div class="row-inline">
+          <label>Ring shape</label>
+          <select id="ringShape">
+            <option value="circle">Circle</option>
+            <option value="star">Star</option>
+            <option value="heart">Heart</option>
+            <option value="square">Square</option>
+            <option value="triangle">Triangle</option>
+            <option value="svgSilhouette">SVG Silhouette</option>
+            <option value="human">Human (parametric)</option>
+          </select>
+        </div>
+        <div class="row">
+          <label>Throat</label>
+          <input type="range" id="throatRadius" min="0.1" max="1" step="0.01" value="1">
+          <span class="val" id="throatRadiusVal">1.00</span>
+        </div>
+        <div class="row">
+          <label>Neck length</label>
+          <input type="range" id="throatScale" min="0.3" max="2" step="0.05" value="1.1">
+          <span class="val" id="throatScaleVal">1.10</span>
+        </div>
+        <div class="row">
+          <label>Funnel depth</label>
+          <input type="range" id="funnelExtent" min="0.5" max="3" step="0.1" value="1.1">
+          <span class="val" id="funnelExtentVal">1.1</span>
+        </div>
+        <div class="row">
+          <label>Disc width</label>
+          <input type="range" id="discWidth" min="1" max="4" step="0.1" value="1">
+          <span class="val" id="discWidthVal">1.0</span>
+        </div>
+        <div class="row">
+          <label>Shape rot.</label>
+          <input type="range" id="shapeRotation" min="0" max="6.283" step="0.01" value="0">
+          <span class="val" id="shapeRotationVal">0.00</span>
+        </div>
+        <div class="row">
+          <label>Meridians</label>
+          <input type="range" id="meridians" min="6" max="48" step="1" value="48">
+          <span class="val" id="meridiansVal">48</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="group open">
+      <div class="group-title">Presets</div>
+      <div class="group-body">
+        <div id="presetButtons" style="display:flex;flex-wrap:wrap;gap:4px;"></div>
+        <button id="savePresetBtn" style="width:100%;margin-top:6px;background:rgba(77,179,255,0.12);border:1px solid rgba(77,179,255,0.35);border-radius:4px;padding:4px 8px;font-family:inherit;font-size:10px;color:#4db3ff;cursor:pointer;">Save Current as Preset</button>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-title">Export</div>
+      <div class="group-body">
+        <div class="row-inline">
+          <label>Ratio</label>
+          <select id="exportRatio">
+            <option value="9:16" selected>9:16 Story</option>
+            <option value="4:5">4:5 Post</option>
+            <option value="1:1">1:1 Square</option>
+            <option value="16:9">16:9 Landscape</option>
+            <option value="free">Free (current)</option>
+          </select>
+        </div>
+        <div class="row-inline">
+          <label>Quality</label>
+          <select id="exportQuality">
+            <option value="1080">1080w</option>
+            <option value="1440" selected>1440w</option>
+            <option value="2160">2160w (4K)</option>
+          </select>
+        </div>
+        <div class="row">
+          <label>Duration (s)</label>
+          <input type="range" id="exportDuration" min="1" max="30" step="1" value="10">
+          <span class="val" id="exportDurationVal">10</span>
+        </div>
+        <div class="row-inline">
+          <label>FPS</label>
+          <select id="exportFps">
+            <option value="30" selected>30</option>
+            <option value="60">60</option>
+          </select>
+        </div>
+        <div class="row-inline">
+          <label>Format</label>
+          <select id="exportFormat">
+            <option value="png" selected>PNG sequence</option>
+            <option value="mp4">MP4 (H.264)</option>
+          </select>
+        </div>
+        <div style="margin-top:6px;display:flex;gap:4px;">
+          <button id="exportVideoBtn" style="flex:1;background:rgba(255,80,80,0.15);border:1px solid rgba(255,80,80,0.4);border-radius:4px;padding:6px 8px;font-family:inherit;font-size:11px;color:#ff6666;cursor:pointer;">Export Video</button>
+          <button id="exportFrameBtn" style="flex:0 0 auto;background:rgba(80,180,255,0.12);border:1px solid rgba(80,180,255,0.35);border-radius:4px;padding:6px 8px;font-family:inherit;font-size:11px;color:#4db3ff;cursor:pointer;">Still</button>
+        </div>
+        <div id="exportStatus" style="margin-top:4px;font-size:10px;color:#888;"></div>
+        <div id="exportProgress" style="margin-top:4px;height:3px;border-radius:2px;background:#222;display:none;">
+          <div id="exportProgressBar" style="height:100%;border-radius:2px;background:#ff6666;width:0%;transition:width 0.1s;"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<audio id="audio-player" src="assets/Smithmonger%20-%20Oh%20Ah%20Oh.mp3" preload="auto" loop></audio>
+
+<script>
+// === BUILT-IN PRESETS ===
+const BUILTIN_PRESETS = {
+  'Astral Body': {
+    global: { bgColor:'#0e0907', lineColor:'#94ffd1', posterColor:'#94ffd1', bloomIntensity:0.6, chromaticAberration:0.003, vignette:0.4, grain:0.1, flatMode:false, posterBlur:0.001, posterThreshold:147, posterScale:1, videoScale:1 },
+    shapes: [{
+      ringWidth:2.5, meridianWidth:1.2, ringAlpha:0.5, meridianAlpha:0.1,
+      glowIntensity:1.5, glowFalloff:4.0, flowSpeed:0.02, flowDir:1, ringCount:60,
+      ringShape:'svgSilhouette', throatRadius:0.93, throatScale:0.3,
+      funnelExtent:0.5, discWidth:2.2, meridians:24, scale:1,
+      x:0, y:0, z:0, rotX:5.43, rotY:6.745,
+    }],
+  },
+  'Classic Wormhole': {
+    global: { bgColor:'#020206', lineColor:'#4db8ff', posterColor:'#4db8ff', bloomIntensity:0.6, chromaticAberration:0.003, vignette:0.4, grain:0.03, flatMode:false, posterBlur:0.001, posterThreshold:147, posterScale:1, videoScale:1 },
+    shapes: [{
+      ringWidth:2.5, meridianWidth:1.2, ringAlpha:0.7, meridianAlpha:0.15,
+      glowIntensity:1.5, glowFalloff:4.0, flowSpeed:0.15, flowDir:1, ringCount:28,
+      ringShape:'circle', throatRadius:0.35, throatScale:0.9,
+      funnelExtent:2.0, discWidth:2.2, meridians:24, scale:1,
+      x:0, y:0, z:0, rotX:5.43, rotY:6.745,
+    }],
+  },
+  'Neon Heart': {
+    global: { bgColor:'#0a0010', lineColor:'#ff4da6', posterColor:'#ff4da6', bloomIntensity:1.0, chromaticAberration:0.005, vignette:0.5, grain:0.04, flatMode:false, posterBlur:0.001, posterThreshold:147, posterScale:1, videoScale:1 },
+    shapes: [{
+      ringWidth:3.0, meridianWidth:0.8, ringAlpha:0.6, meridianAlpha:0.08,
+      glowIntensity:2.0, glowFalloff:3.0, flowSpeed:0.08, flowDir:1, ringCount:40,
+      ringShape:'heart', throatRadius:0.5, throatScale:0.7,
+      funnelExtent:1.5, discWidth:2.0, meridians:20, scale:1,
+      x:0, y:0, z:0, rotX:5.43, rotY:6.745,
+    }],
+  },
+  'DR1': {
+    global: { bgColor:'#212C2A', lineColor:'#FF881A', posterColor:'#3055E8', bloomIntensity:0.0, chromaticAberration:0.003, vignette:0.0, grain:0.1, flatMode:true, posterBlur:0.001, posterThreshold:147, posterScale:1, videoScale:1 },
+    shapes: [{
+      ringWidth:3.9, meridianWidth:1.2, ringAlpha:1.0, meridianAlpha:0.0,
+      glowIntensity:0.3, glowFalloff:4.7, flowSpeed:0.02, flowDir:-1, ringCount:60,
+      ringShape:'circle', throatRadius:1.0, throatScale:2.0,
+      funnelExtent:0.5, discWidth:1.0, meridians:48, scale:1,
+      x:0, y:0, z:0, rotX:5.43, rotY:6.745,
+    }],
+  },
+  'DR2': {
+    global: { bgColor:'#3055e8', lineColor:'#f07605', posterColor:'#26272c', posterColor2:'#d1d3db', bloomIntensity:0, chromaticAberration:0, vignette:0, grain:0.1, flatMode:true, posterBlur:0.001, posterThreshold:147, posterScale:1, videoScale:0.75, videoScalePort:0.6 },
+    shapes: [],
+    posterElements: [
+      { id:'danaruh', x:0.2579, y:0.2291, size:0.108, portX:0.4022, portY:0.1828, portSize:0.114, altColor:true },
+      { id:'brouquade', x:0.1907, y:0.329, size:0.0168, portX:0.2504, portY:0.225, portSize:0.019 },
+      { id:'zepha', x:0.8227, y:0.3137, size:0.097, portX:0.7742, portY:0.3149, altColor:true },
+      { id:'diewell', x:0.8927, y:0.3898, size:0.0168, portX:0.8897, portY:0.3669, portSize:0.019 },
+      { id:'supportlbl', x:0.0898, y:0.6366, size:0.024, portX:0.0283, portY:0.77, portSize:0.033 },
+      { id:'support', x:0.2491, y:0.7583, size:0.04, portX:0.4529, portY:0.8171, portSize:0.053, altColor:true },
+      { id:'ritmo', x:0.5763, y:0.0689, size:0.0147, portX:0.6717, portY:0.0664, portSize:0.016 },
+      { id:'abril', x:0.7947, y:0.8256, size:0.048, portX:0.9439, portY:0.7253, portSize:0.046, altColor:true },
+      { id:'direccion', x:0.6261, y:0.9717, size:0.02, portX:0.7435, portY:0.9636 },
+      { id:'entradas', x:0.9359, y:0.9448, size:0.028, portX:0.6134, portY:0.8809, portSize:0.024 },
+      { id:'relogo', x:0.4993, y:0.0592, size:0.059, portX:0.5048, portY:0.0609, portSize:0.072, altColor:true },
+      { id:'radio28', x:0.4988, y:0.909, size:0.021, portX:0.5, portY:0.93, portSize:0.031, altColor:true },
+      { id:'vinylevent', x:0.119, y:0.922, size:0.06, portX:0.0796, portY:0.9396, portSize:0.063 },
+    ],
+  },
+  'Star Portal': {
+    global: { bgColor:'#000408', lineColor:'#ffd700', posterColor:'#ffd700', bloomIntensity:0.8, chromaticAberration:0.004, vignette:0.35, grain:0.02, flatMode:false, posterBlur:0.001, posterThreshold:147, posterScale:1, videoScale:1 },
+    shapes: [{
+      ringWidth:2.0, meridianWidth:1.0, ringAlpha:0.6, meridianAlpha:0.12,
+      glowIntensity:1.8, glowFalloff:3.5, flowSpeed:0.1, flowDir:-1, ringCount:35,
+      ringShape:'star', throatRadius:0.4, throatScale:1.0,
+      funnelExtent:1.8, discWidth:2.5, meridians:30, scale:1,
+      x:0, y:0, z:0, rotX:5.43, rotY:6.745,
+    }],
+  },
+  'DR3': {
+    global: { bgColor:'#3055e8', lineColor:'#f07605', posterColor:'#d1d3db', posterColor2:'#d1d3db', bloomIntensity:0, chromaticAberration:0, vignette:0, grain:0.1, flatMode:true, posterBlur:0.001, posterThreshold:147, posterScale:1, videoScale:0.75, videoScalePort:0.6 },
+    shapes: [],
+    posterElements: [
+      { id:'danaruh', x:0.2579, y:0.2291, size:0.108, midX:0.3152, midY:0.2507, portX:0.4022, portY:0.1828, portSize:0.114 },
+      { id:'brouquade', x:0.1907, y:0.329, size:0.0168, midX:0.1845, midY:0.3293, portX:0.2504, portY:0.225, portSize:0.019 },
+      { id:'zepha', x:0.8227, y:0.3137, size:0.097, midX:0.9386, midY:0.3519, portX:0.7742, portY:0.3149 },
+      { id:'diewell', x:0.8927, y:0.3898, size:0.0168, midX:0.9202, midY:0.4036, portX:0.8897, portY:0.3669, portSize:0.019 },
+      { id:'supportlbl', x:0.0898, y:0.6366, size:0.024, portX:0.0283, portY:0.77, portSize:0.033, altColor:true },
+      { id:'support', x:0.2491, y:0.7583, size:0.04, midX:0.3122, midY:0.8249, portX:0.4529, portY:0.8171, portSize:0.053 },
+      { id:'ritmo', x:0.5763, y:0.0689, size:0.0147, midX:0.6176, midY:0.068, portX:0.6717, portY:0.0664, portSize:0.016 },
+      { id:'abril', x:0.7947, y:0.8256, size:0.048, midX:0.8735, midY:0.7505, portX:0.9439, portY:0.7253, portSize:0.046, altColor:true },
+      { id:'direccion', x:0.6261, y:0.9717, size:0.02, midX:0.6912, midY:0.9643, portX:0.7435, portY:0.9636 },
+      { id:'entradas', x:0.9359, y:0.9448, size:0.028, midX:0.9596, midY:0.9442, portX:0.6134, portY:0.8809, portSize:0.024, altColor:true },
+      { id:'relogo', x:0.4993, y:0.0592, size:0.059, portX:0.5048, portY:0.0609, portSize:0.072 },
+      { id:'radio28', x:0.4988, y:0.909, size:0.021, portX:0.5, portY:0.93, portSize:0.031, altColor:true },
+      { id:'vinylevent', x:0.119, y:0.922, size:0.06, portX:0.0796, portY:0.9396, portSize:0.063, altColor:true },
+    ],
+  },
+  'DR4': {
+    global: { bgColor:'#3055e8', lineColor:'#f07605', posterColor:'#26272c', posterColor2:'#d1d3db', bloomIntensity:0, chromaticAberration:0, vignette:0, grain:0.1, flatMode:true, posterBlur:0.001, posterThreshold:147, posterScale:1, videoScale:0.75, videoScalePort:0.6 },
+    shapes: [],
+    posterElements: [
+      { id:'danaruh', x:0.2818, y:0.2693, size:0.108, midX:0.2342, midY:0.2461, portX:0.3954, portY:0.2336, portSize:0.114, altColor:true },
+      { id:'brouquade', x:0.2051, y:0.3952, size:0.0168, midX:0.2345, midY:0.3095, portX:0.2517, portY:0.2951, portSize:0.019 },
+      { id:'zepha', x:0.7862, y:0.3332, size:0.097, midX:0.7747, midY:0.3568, portX:0.8445, portY:0.3765, altColor:true },
+      { id:'diewell', x:0.8777, y:0.4115, size:0.0168, midX:0.9096, midY:0.4131, portX:0.8189, portY:0.423, portSize:0.019 },
+      { id:'supportlbl', x:0.1508, y:0.6985, size:0.024, midX:0.0705, midY:0.7637, portX:0.0816, portY:0.7668, portSize:0.033 },
+      { id:'support', x:0.2814, y:0.8082, size:0.04, midX:0.3346, midY:0.8315, portX:0.4509, portY:0.8388, portSize:0.053, altColor:true },
+      { id:'ritmo', x:0.4336, y:0.665, size:0.0147, midX:0.3681, midY:0.6973, portX:0.3154, portY:0.6863, portSize:0.016 },
+      { id:'abril', x:0.7947, y:0.8256, size:0.048, portX:0.9439, portY:0.7253, portSize:0.046, altColor:true },
+      { id:'direccion', x:0.6261, y:0.9717, size:0.02, midX:0.696, midY:0.9662, portX:0.7435, portY:0.9636 },
+      { id:'entradas', x:0.9359, y:0.9448, size:0.028, midX:0.9499, midY:0.9486, midSize:0.036, portX:0.931, portY:0.9487, portSize:0.024 },
+      { id:'relogo', x:0.4993, y:0.0592, size:0.059, portX:0.5048, portY:0.0609, portSize:0.072, altColor:true },
+      { id:'radio28', x:0.4988, y:0.909, size:0.021, portX:0.5, portY:0.93, portSize:0.031, altColor:true },
+      { id:'vinylevent', x:0.119, y:0.922, size:0.06, portX:0.0796, portY:0.9396, portSize:0.063 },
+    ],
+  },
+  'DR5': {
+    global: { bgColor:'#3055E8', lineColor:'#F07605', posterColor:'#D1D3DB', posterColor2:'#26272C', bloomIntensity:0, chromaticAberration:0, vignette:0, grain:0.1, flatMode:true, posterBlur:0.001, posterThreshold:147, posterScale:1, videoScale:0.75, videoScalePort:0.7 },
+    shapes: [],
+    posterElements: [
+      { id:'danaruh', x:0.2818, y:0.2693, size:0.099, midX:0.3183, midY:0.2451, midSize:0.112, portX:0.3812, portY:0.2143, portSize:0.094 },
+      { id:'brouquade', x:0.2051, y:0.3952, size:0.0168, midX:0.2345, midY:0.3095, portX:0.2716, portY:0.2649, portSize:0.019 },
+      { id:'zepha', x:0.7862, y:0.3332, size:0.098, midX:0.8074, midY:0.3648, midSize:0.11, portX:1.0998, portY:0.3202, portSize:0.086 },
+      { id:'diewell', x:0.8777, y:0.4115, size:0.0168, midX:0.9096, midY:0.4131, portX:0.8477, portY:0.3652, portSize:0.019 },
+      { id:'supportlbl', x:0.1508, y:0.6985, size:0.024, midX:0.0705, midY:0.7637, portX:0.0572, portY:0.7529, portSize:0.033 },
+      { id:'support', x:0.2814, y:0.8082, size:0.039, midX:0.3346, midY:0.8315, portX:0.4246, portY:0.8046, portSize:0.053 },
+      { id:'ritmo', x:0.4336, y:0.665, size:0.0147, midX:0.3681, midY:0.6973, portX:0.3154, portY:0.6863, portSize:0.016 },
+      { id:'abril', x:0.7947, y:0.8256, size:0.046, portX:1.0022, portY:0.8791, portSize:0.079, altColor:true },
+      { id:'direccion', x:0.6261, y:0.9717, size:0.02, midX:0.6874, midY:0.9666, portX:0.7435, portY:0.9636 },
+      { id:'entradas', x:0.9359, y:0.9448, size:0.028, midX:0.9499, midY:0.9486, midSize:0.036, portX:0.9778, portY:0.9489, portSize:0.024 },
+      { id:'relogo', x:0.4993, y:0.0592, size:0.059, portX:0.5048, portY:0.0609, portSize:0.072 },
+      { id:'radio28', x:0.4988, y:0.909, size:0.021, portX:0.5, portY:0.93, portSize:0.031, altColor:true },
+      { id:'vinylevent', x:0.119, y:0.922, size:0.06, portX:0.0796, portY:0.9396, portSize:0.063 },
+    ],
+  },
+  'Poster Only': {
+    global: { bgColor:'#B3BFC1', lineColor:'#F07605', posterColor:'#3055E8', bloomIntensity:0, chromaticAberration:0, vignette:0, grain:0.1, flatMode:true, posterBlur:0.001, posterThreshold:147, posterScale:1, videoScale:1 },
+    shapes: [],
+  },
+};
+
+// === SETUP ===
+const canvas = document.getElementById('c');
+const gl = canvas.getContext('webgl2', { antialias: false, alpha: false, preserveDrawingBuffer: true, colorSpace: 'srgb' });
+if (gl.drawingBufferColorSpace) gl.drawingBufferColorSpace = 'srgb';
+if (!gl) { document.body.innerHTML = '<p style="color:#fff;padding:2em;">WebGL2 required</p>'; throw 'no gl'; }
+
+let introComplete = false;
+let isExporting = false;
+
+// === GLOBAL STATE ===
+const G = {
+  time: 0,
+  lineColor: [0.941, 0.463, 0.020],
+  bgColor: [0.702, 0.749, 0.757],
+  posterColor: [0.189, 0.333, 0.910],
+  cameraZ: -20,
+  panX: 7.965,
+  panY: 3.63,
+  bloomIntensity: 0,
+  chromaticAberration: 0,
+  vignette: 0,
+  grain: 0.1,
+  flatMode: true,
+  masterScale: 0,
+  masterOpacity: 0,
+  posterBlur: 0.001,
+  posterThreshold: 147,
+  posterScale: 1,
+  videoScale: 1,
+  videoScalePort: null,
+  video2Enabled: false,
+  posterColor2: [0.189, 0.333, 0.910],
+  posterReveal: 0,       // 0 = hidden, 1 = fully revealed
+  revealBlurMax: 0.025,  // max blur radius at reveal=0
+  revealThreshStart: 0.02, // threshold at reveal=0
+  revealDuration: 3,
+  revealDelay: 0.5,
+};
+
+// === PER-SHAPE STATE ===
+let nextShapeId = 1;
+function createShape(overrides = {}) {
+  return {
+    id: nextShapeId++,
+    x: 0, y: 0, z: 0,
+    rotX: 5.43, rotY: 6.745,
+    targetRotX: 5.43, targetRotY: 6.745,
+    throatRadius: 1, throatScale: 1.1, funnelExtent: 1.1, discWidth: 1,
+    meridians: 48, ringCount: 37,
+    ringShape: 'circle', shapeRotation: 0, shapeMorphBlend: 0,
+    ringWidth: 5.3, meridianWidth: 0.3,
+    ringAlpha: 1, meridianAlpha: 0,
+    glowIntensity: 0, glowFalloff: 4.7,
+    flowSpeed: 0.09, flowDir: -1, flowOffset: 0,
+    scale: 1,
+    shapeTransition: { blend: 0, fromShape: null, toShape: null, active: false },
+    ...overrides,
+  };
+}
+
+let shapes = [createShape()];
+let selectedIdx = 0;
+function sel() { return shapes.length ? shapes[selectedIdx] : null; }
+
+// === PER-SHAPE KEYS ===
+const SHAPE_KEYS = new Set([
+  'ringWidth','meridianWidth','ringAlpha','meridianAlpha',
+  'glowIntensity','glowFalloff','flowSpeed','ringCount',
+  'throatRadius','throatScale','funnelExtent','discWidth',
+  'shapeRotation','meridians'
+]);
+
+// === CONTROLS ===
+const toggleBtn = document.getElementById('toggle');
+const panel = document.getElementById('panel');
+toggleBtn.addEventListener('click', () => panel.classList.toggle('open'));
+
+// Collapsible groups with GSAP
+document.querySelectorAll('.group').forEach(group => {
+  const body = group.querySelector('.group-body');
+  if (!body) return;
+
+  // Initialize open groups to their natural height
+  if (group.classList.contains('open')) {
+    body.style.height = 'auto';
+    body.style.opacity = '1';
+  }
+
+  group.querySelector('.group-title').addEventListener('click', () => {
+    const isOpen = group.classList.contains('open');
+    if (isOpen) {
+      gsap.fromTo(body,
+        { height: body.scrollHeight, opacity: 1 },
+        { height: 0, opacity: 0, duration: 0.25, ease: 'power2.inOut',
+          onComplete: () => { group.classList.remove('open'); body.style.paddingBottom = '0'; }
+        });
+    } else {
+      group.classList.add('open');
+      body.style.paddingBottom = '10px';
+      const targetH = body.scrollHeight;
+      gsap.fromTo(body,
+        { height: 0, opacity: 0 },
+        { height: targetH, opacity: 1, duration: 0.25, ease: 'power2.inOut',
+          onComplete: () => { body.style.height = 'auto'; }
+        });
+    }
+  });
+});
+
+function hexToRGB(hex) {
+  const r = parseInt(hex.slice(1,3), 16) / 255;
+  const g = parseInt(hex.slice(3,5), 16) / 255;
+  const b = parseInt(hex.slice(5,7), 16) / 255;
+  return [r, g, b];
+}
+
+function bindRange(id, key, decimals = 2) {
+  const input = document.getElementById(id);
+  const valEl = document.getElementById(id + 'Val');
+  if (!input) return;
+  input.addEventListener('input', () => {
+    const target = SHAPE_KEYS.has(key) ? sel() : G;
+    target[key] = parseFloat(input.value);
+    if (valEl) valEl.textContent = target[key].toFixed(decimals);
+  });
+}
+
+function bindColor(id, key) {
+  const picker = document.getElementById(id);
+  const hexInput = document.getElementById(id + 'Hex');
+  if (!picker) return;
+  picker.addEventListener('input', () => {
+    G[key] = hexToRGB(picker.value);
+    if (hexInput) hexInput.value = picker.value.toUpperCase();
+  });
+  if (!hexInput) return;
+  function applyHex() {
+    let v = hexInput.value.trim();
+    if (!v.startsWith('#')) v = '#' + v;
+    if (/^#[0-9a-fA-F]{6}$/.test(v)) {
+      picker.value = v.toLowerCase();
+      G[key] = hexToRGB(v);
+      hexInput.value = v.toUpperCase();
+    }
+  }
+  hexInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { applyHex(); hexInput.blur(); }
+  });
+  hexInput.addEventListener('blur', applyHex);
+  hexInput.addEventListener('focus', () => hexInput.select());
+}
+
+bindColor('bgColor', 'bgColor');
+bindColor('lineColor', 'lineColor');
+bindRange('ringWidth', 'ringWidth', 1);
+bindRange('meridianWidth', 'meridianWidth', 1);
+bindRange('ringAlpha', 'ringAlpha', 2);
+bindRange('meridianAlpha', 'meridianAlpha', 2);
+bindRange('glowIntensity', 'glowIntensity', 1);
+bindRange('glowFalloff', 'glowFalloff', 1);
+bindRange('flowSpeed', 'flowSpeed', 2);
+bindRange('ringCount', 'ringCount', 0);
+bindRange('bloomIntensity', 'bloomIntensity', 2);
+bindRange('chromaticAberration', 'chromaticAberration', 3);
+bindRange('vignette', 'vignette', 2);
+bindRange('grain', 'grain', 3);
+
+// Poster overlay controls
+['posterBlur', 'posterThreshold'].forEach(id => {
+  const input = document.getElementById(id);
+  const valEl = document.getElementById(id + 'Val');
+  if (!input) return;
+  input.addEventListener('input', () => {
+    G[id] = parseFloat(input.value);
+    if (valEl) valEl.textContent = id === 'posterBlur' ? G[id].toFixed(4) : G[id].toFixed(0);
+    if (posterReady || posterTex) renderPosterTexture();
+  });
+});
+
+// Poster text color
+bindColor('posterColor', 'posterColor');
+bindColor('posterColor2', 'posterColor2');
+
+// === COLOR SWAP ===
+function syncColorUI(key) {
+  const toHex = (rgb) => '#' + rgb.map(c => Math.round(c*255).toString(16).padStart(2,'0')).join('');
+  const hex = toHex(G[key]);
+  const picker = document.getElementById(key);
+  const hexInput = document.getElementById(key + 'Hex');
+  if (picker) picker.value = hex;
+  if (hexInput) hexInput.value = hex.toUpperCase();
+}
+
+document.querySelectorAll('.swap-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const [a, b] = btn.dataset.swap.split(',');
+    const tmpA = G[a].slice();
+    const tmpB = G[b].slice();
+    // Animate swap
+    gsap.to(G[a], { 0: tmpB[0], 1: tmpB[1], 2: tmpB[2], duration: 0.4, ease: 'power2.inOut', onUpdate: () => syncColorUI(a) });
+    gsap.to(G[b], { 0: tmpA[0], 1: tmpA[1], 2: tmpA[2], duration: 0.4, ease: 'power2.inOut', onUpdate: () => syncColorUI(b) });
+    if (a === 'posterColor' || b === 'posterColor' || a === 'posterColor2' || b === 'posterColor2') {
+      setTimeout(() => renderPosterTexture(), 450);
+    }
+  });
+});
+
+// Flash through color profiles
+let flashInterval = null;
+let flashIdx = 0;
+document.getElementById('flashSpeed').addEventListener('input', (e) => {
+  document.getElementById('flashSpeedVal').textContent = e.target.value;
+});
+document.getElementById('flashBtn').addEventListener('click', () => {
+  const btn = document.getElementById('flashBtn');
+  if (flashInterval) {
+    clearInterval(flashInterval);
+    flashInterval = null;
+    btn.textContent = 'Go';
+    btn.style.color = '#ff6666';
+    return;
+  }
+  btn.textContent = 'Stop';
+  btn.style.color = '#4db3ff';
+  flashIdx = 0;
+  const speed = parseInt(document.getElementById('flashSpeed').value);
+  flashInterval = setInterval(() => {
+    if (flashIdx >= colorProfiles.length) flashIdx = 0;
+    applyColorProfile(colorProfiles[flashIdx]);
+    flashIdx++;
+  }, speed);
+});
+
+// === COLOR PROFILES ===
+const colorProfiles = [
+  { name: 'Light / Blue', bg: '#B3BFC1', line: '#F07605', text: '#3055E8' },
+  { name: 'Dark / Orange', bg: '#0D1E21', line: '#F07605', text: '#F07605' },
+  { name: 'Dark / Teal', bg: '#0E0907', line: '#94FFD1', text: '#94FFD1' },
+  { name: 'Midnight / Pink', bg: '#0A0010', line: '#FF4DA6', text: '#FF4DA6' },
+  { name: 'Deep Blue / Ice', bg: '#020206', line: '#4DB8FF', text: '#4DB8FF' },
+  { name: 'Dark / Green', bg: '#191B1F', line: '#FD7E08', text: '#24FF5B' },
+  { name: 'Dark Blue', bg: '#263336', line: '#F07605', text: '#1A47FF' },
+  { name: 'DR2c', bg: '#3055E8', line: '#F07605', text: '#26272C', text2: '#D1D3DB' },
+  { name: 'DR2c2', bg: '#D1D3DB', line: '#F07605', text: '#26272C', text2: '#3055E8' },
+  { name: 'DR2c3', bg: '#26272C', line: '#D1D3DB', text: '#F07605', text2: '#3055E8' },
+  { name: 'DR2c4', bg: '#26272C', line: '#F07605', text: '#D1D3DB', text2: '#3055E8' },
+  { name: 'DR2c5', bg: '#D1D3DB', line: '#3055E8', text: '#26272C', text2: '#F07605' },
+  { name: 'DR2c6', bg: '#4072E7', line: '#5CFFC0', text: '#44414E', text2: '#25211D' },
+  { name: 'DR2c7', bg: '#4072E7', line: '#25211D', text: '#BFE8D9', text2: '#FF7214' },
+  { name: 'DR2c8', bg: '#4072E7', line: '#FF7214', text: '#2D3937', text2: '#DEEDE7' },
+  { name: 'DR3c9', bg: '#15181E', line: '#9EFFDF', text: '#FFFFFF', text2: '#FF570F' },
+  { name: 'DR4c1', bg: '#171F21', line: '#F4680B', text: '#D1FFFA', text2: '#5FB4BF' },
+  { name: 'DR4c3', bg: '#82A8BF', line: '#14F089', text: '#FFFFFF', text2: '#5C5E66' },
+  { name: 'DR4c4', bg: '#171F21', line: '#5367FD', text: '#5CCEFF', text2: '#5CCEFF' },
+  { name: 'DR5c1', bg: '#171F21', line: '#4652FB', text: '#BDEBFF', text2: '#FF751A' },
+  { name: 'DRFinal', bg: '#3055E8', line: '#F07605', text: '#26272C', text2: '#D1D3DB' },
+];
+const colorProfileSelect = document.getElementById('colorProfile');
+const colorProfileSaveBtn = document.getElementById('colorProfileSave');
+
+function rebuildProfileDropdown() {
+  colorProfileSelect.innerHTML = '<option value="custom">Custom</option>';
+  colorProfiles.forEach((p, i) => {
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = p.name;
+    colorProfileSelect.appendChild(opt);
+  });
+}
+rebuildProfileDropdown();
+colorProfileSelect.value = '0'; // Default to Light / Blue
+
+function applyColorProfile(p) {
+  const rgb = (hex) => [parseInt(hex.slice(1,3),16)/255, parseInt(hex.slice(3,5),16)/255, parseInt(hex.slice(5,7),16)/255];
+  const setColor = (key, hex) => {
+    const c = rgb(hex);
+    G[key][0] = c[0]; G[key][1] = c[1]; G[key][2] = c[2];
+    const picker = document.getElementById(key);
+    const hexInput = document.getElementById(key + 'Hex');
+    if (picker) picker.value = hex;
+    if (hexInput) hexInput.value = hex.toUpperCase();
+  };
+  setColor('bgColor', p.bg);
+  setColor('lineColor', p.line);
+  setColor('posterColor', p.text);
+  if (p.text2) setColor('posterColor2', p.text2);
+}
+
+colorProfileSelect.addEventListener('change', () => {
+  const val = colorProfileSelect.value;
+  if (val === 'custom') return;
+  applyColorProfile(colorProfiles[parseInt(val)]);
+});
+
+colorProfileSaveBtn.addEventListener('click', () => {
+  const toHex = (rgb) => '#' + rgb.map(c => Math.round(c*255).toString(16).padStart(2,'0')).join('');
+  const name = prompt('Profile name:');
+  if (!name) return;
+  colorProfiles.push({
+    name,
+    bg: toHex(G.bgColor),
+    line: toHex(G.lineColor),
+    text: toHex(G.posterColor),
+    text2: toHex(G.posterColor2),
+  });
+  rebuildProfileDropdown();
+  colorProfileSelect.value = colorProfiles.length - 1;
+});
+
+// Global poster scale
+document.getElementById('posterScale').addEventListener('input', (e) => {
+  G.posterScale = parseFloat(e.target.value);
+  document.getElementById('posterScaleVal').textContent = G.posterScale.toFixed(2);
+  renderPosterTexture();
+});
+
+// Poster reveal controls
+['posterReveal', 'revealBlurMax', 'revealThreshStart', 'revealDuration', 'revealDelay'].forEach(id => {
+  document.getElementById(id).addEventListener('input', (e) => {
+    G[id] = parseFloat(e.target.value);
+    const dec = id === 'revealDuration' || id === 'revealDelay' ? 1 : (id === 'posterReveal' ? 2 : 3);
+    document.getElementById(id + 'Val').textContent = G[id].toFixed(dec);
+  });
+});
+
+let revealTween = null;
+function playReveal() {
+  if (revealTween) revealTween.kill();
+  G.posterReveal = 0;
+  document.getElementById('posterReveal').value = 0;
+  document.getElementById('posterRevealVal').textContent = '0.00';
+  revealTween = gsap.to(G, {
+    posterReveal: 1,
+    duration: G.revealDuration,
+    delay: G.revealDelay,
+    ease: 'power3.out',
+    onUpdate: () => {
+      document.getElementById('posterReveal').value = G.posterReveal;
+      document.getElementById('posterRevealVal').textContent = G.posterReveal.toFixed(2);
+    },
+  });
+}
+
+document.getElementById('replayReveal').addEventListener('click', playReveal);
+
+// Video scale
+document.getElementById('videoScale').addEventListener('input', (e) => {
+  const v = parseFloat(e.target.value);
+  const isPort = canvas.height > canvas.width;
+  if (isPort) {
+    G.videoScalePort = v;
+  } else {
+    G.videoScale = v;
+  }
+  document.getElementById('videoScaleVal').textContent = v.toFixed(2);
+});
+
+document.getElementById('video2Toggle').addEventListener('change', (e) => {
+  G.video2Enabled = e.target.checked;
+});
+
+// Build per-element size controls
+function buildElementControls() {
+  const container = document.getElementById('posterElementControls');
+  container.innerHTML = '';
+  for (const el of posterElements) {
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.innerHTML = `<label style="font-size:9px">${el.id}</label>
+      <input type="range" min="0.005" max="0.15" step="0.001" value="${el.size}" data-el-id="${el.id}">
+      <span class="val">${el.size.toFixed(3)}</span>
+      <input type="checkbox" ${el.altColor ? 'checked' : ''} title="Use Text color 2" style="width:15px;height:15px;flex-shrink:0;">`;
+    const input = row.querySelector('input[type="range"]');
+    const val = row.querySelector('.val');
+    const cb = row.querySelector('input[type="checkbox"]');
+    input.addEventListener('input', () => {
+      const v = parseFloat(input.value);
+      const aspect = canvas.width / canvas.height;
+      if (aspect < 0.56) {
+        el.portSize = v;
+      } else if (aspect < 1.4) {
+        el.midSize = v;
+      } else {
+        el.size = v;
+      }
+      val.textContent = v.toFixed(3);
+      renderPosterTexture(true);
+    });
+    input.addEventListener('change', () => renderPosterTexture(false));
+    cb.addEventListener('change', () => {
+      el.altColor = cb.checked;
+      renderPosterTexture(false);
+    });
+    container.appendChild(row);
+  }
+}
+document.getElementById('posterEditToggle').addEventListener('change', (e) => {
+  posterEditMode = e.target.checked;
+  canvas.style.cursor = posterEditMode ? 'crosshair' : 'grab';
+  document.getElementById('posterElementControls').style.display = posterEditMode ? 'block' : 'none';
+  renderPosterTexture();
+});
+
+document.getElementById('posterSaveLayout').addEventListener('click', () => {
+  const layout = posterElements.map(el => ({ id: el.id, x: +el.x.toFixed(4), y: +el.y.toFixed(4), size: +el.size.toFixed(4) }));
+  console.log('Poster layout:', JSON.stringify(layout, null, 2));
+  navigator.clipboard.writeText(JSON.stringify(layout, null, 2)).then(() => {
+    const btn = document.getElementById('posterSaveLayout');
+    btn.textContent = 'Copied to clipboard!';
+    setTimeout(() => { btn.textContent = 'Save layout to console'; }, 2000);
+  });
+});
+
+bindRange('throatRadius', 'throatRadius', 2);
+bindRange('throatScale', 'throatScale', 2);
+bindRange('funnelExtent', 'funnelExtent', 1);
+bindRange('discWidth', 'discWidth', 1);
+bindRange('shapeRotation', 'shapeRotation', 2);
+bindRange('meridians', 'meridians', 0);
+
+document.getElementById('flowDir').addEventListener('change', (e) => {
+  sel().flowDir = parseInt(e.target.value);
+});
+
+document.getElementById('ringShape').addEventListener('change', (e) => {
+  const newShape = e.target.value;
+  const s = sel();
+  if (newShape === s.ringShape) return;
+  s.shapeTransition.fromShape = s.ringShape;
+  s.shapeTransition.toShape = newShape;
+  s.shapeTransition.blend = 0;
+  s.shapeTransition.active = true;
+  gsap.to(s.shapeTransition, {
+    blend: 1, duration: 1, ease: 'power2.inOut',
+    onComplete: () => { s.ringShape = newShape; s.shapeTransition.active = false; s.shapeTransition.blend = 0; }
+  });
+});
+
+// === SYNC UI TO SELECTED SHAPE ===
+function syncUIToShape(shape) {
+  const sets = {
+    ringWidth: [1], meridianWidth: [1], ringAlpha: [2], meridianAlpha: [2],
+    glowIntensity: [1], glowFalloff: [1], flowSpeed: [2], ringCount: [0],
+    throatRadius: [2], throatScale: [2], funnelExtent: [1], discWidth: [1],
+    shapeRotation: [2], meridians: [0],
+  };
+  for (const [key, [dec]] of Object.entries(sets)) {
+    const el = document.getElementById(key);
+    const valEl = document.getElementById(key + 'Val');
+    if (el) el.value = shape[key];
+    if (valEl) valEl.textContent = typeof shape[key] === 'number' ? shape[key].toFixed(dec) : shape[key];
+  }
+  document.getElementById('ringShape').value = shape.ringShape;
+  document.getElementById('flowDir').value = shape.flowDir;
+}
+
+// === SHAPE BAR ===
+function rebuildShapeBar() {
+  const bar = document.getElementById('shapeBar');
+  bar.innerHTML = '';
+  shapes.forEach((s, i) => {
+    const pill = document.createElement('button');
+    pill.className = 'shape-pill' + (i === selectedIdx ? ' selected' : '');
+    pill.textContent = (i + 1);
+    pill.addEventListener('click', () => { selectedIdx = i; syncUIToShape(sel()); rebuildShapeBar(); });
+    bar.appendChild(pill);
+  });
+  // + button
+  const addBtn = document.createElement('button');
+  addBtn.className = 'shape-pill add';
+  addBtn.textContent = '+';
+  addBtn.title = 'Add shape';
+  addBtn.addEventListener('click', () => {
+    const offset = shapes.length * 2;
+    shapes.push(createShape({ x: offset }));
+    selectedIdx = shapes.length - 1;
+    syncUIToShape(sel());
+    rebuildShapeBar();
+  });
+  bar.appendChild(addBtn);
+  // Delete button
+  if (shapes.length > 0) {
+    const delBtn = document.createElement('button');
+    delBtn.className = 'shape-pill del';
+    delBtn.textContent = '\u00d7';
+    delBtn.title = 'Delete selected shape';
+    delBtn.addEventListener('click', () => {
+      if (shapes.length <= 0) return;
+      shapes.splice(selectedIdx, 1);
+      selectedIdx = Math.min(selectedIdx, Math.max(0, shapes.length - 1));
+      if (shapes.length > 0) syncUIToShape(sel());
+      rebuildShapeBar();
+    });
+    bar.appendChild(delBtn);
+  }
+}
+rebuildShapeBar();
+
+// === PRESET SYSTEM (smooth GSAP transitions) ===
+function loadPreset(name) {
+  const p = BUILTIN_PRESETS[name];
+  if (!p) return;
+
+  const globalData = p.global || {};
+  const shapeDataArr = p.shapes || [{}];
+
+  // --- Global tween ---
+  const globalTweenTarget = {};
+  const colorTargets = {};
+
+  for (const [k, v] of Object.entries(globalData)) {
+    if ((k === 'lineColor' || k === 'bgColor' || k === 'posterColor' || k === 'posterColor2') && typeof v === 'string') {
+      colorTargets[k] = hexToRGB(v);
+      continue;
+    }
+    if (k === 'flatMode') { G.flatMode = v; document.getElementById('flatMode').checked = v; continue; }
+    if (G.hasOwnProperty(k)) {
+      globalTweenTarget[k] = v;
+    }
+  }
+
+  const toHex = (rgb) => '#' + rgb.map(c => Math.round(c*255).toString(16).padStart(2,'0')).join('');
+
+  function syncGlobalUI() {
+    const globalRangeMap = {
+      bloomIntensity:'bloomIntensity', chromaticAberration:'chromaticAberration',
+      vignette:'vignette', grain:'grain',
+      posterBlur:'posterBlur', posterThreshold:'posterThreshold',
+      posterScale:'posterScale', videoScale:'videoScale',
+    };
+    for (const [stateKey, elId] of Object.entries(globalRangeMap)) {
+      const el = document.getElementById(elId);
+      const valEl = document.getElementById(elId + 'Val');
+      if (el) el.value = G[stateKey];
+      if (valEl) {
+        if (stateKey === 'posterBlur') valEl.textContent = G[stateKey].toFixed(4);
+        else if (stateKey === 'posterThreshold') valEl.textContent = G[stateKey].toFixed(0);
+        else valEl.textContent = G[stateKey] < 0.01 ? G[stateKey].toFixed(3) : G[stateKey].toFixed(2);
+      }
+    }
+    document.getElementById('bgColor').value = toHex(G.bgColor);
+    document.getElementById('bgColorHex').value = toHex(G.bgColor).toUpperCase();
+    document.getElementById('lineColor').value = toHex(G.lineColor);
+    document.getElementById('lineColorHex').value = toHex(G.lineColor).toUpperCase();
+    document.getElementById('posterColor').value = toHex(G.posterColor);
+    document.getElementById('posterColorHex').value = toHex(G.posterColor).toUpperCase();
+    document.getElementById('posterColor2').value = toHex(G.posterColor2);
+    document.getElementById('posterColor2Hex').value = toHex(G.posterColor2).toUpperCase();
+  }
+
+  gsap.to(G, {
+    ...globalTweenTarget,
+    duration: 1,
+    ease: 'power2.inOut',
+    onUpdate: () => {
+      syncGlobalUI();
+      if (posterReady || posterTex) renderPosterTexture();
+    },
+  });
+
+  for (const colorKey of ['lineColor', 'bgColor', 'posterColor', 'posterColor2']) {
+    if (colorTargets[colorKey]) {
+      gsap.to(G[colorKey], { 0: colorTargets[colorKey][0], 1: colorTargets[colorKey][1], 2: colorTargets[colorKey][2], duration: 1, ease: 'power2.inOut' });
+    }
+  }
+
+  // --- Poster elements ---
+  if (p.posterElements) {
+    for (const pe of p.posterElements) {
+      const el = posterElements.find(e => e.id === pe.id);
+      if (el) {
+        if (pe.x !== undefined) el.x = pe.x;
+        if (pe.y !== undefined) el.y = pe.y;
+        if (pe.size !== undefined) el.size = pe.size;
+        if (pe.text !== undefined) el.text = pe.text;
+        if (pe.midX !== undefined) el.midX = pe.midX;
+        if (pe.midY !== undefined) el.midY = pe.midY;
+        if (pe.midSize !== undefined) el.midSize = pe.midSize;
+        if (pe.portX !== undefined) el.portX = pe.portX;
+        if (pe.portY !== undefined) el.portY = pe.portY;
+        if (pe.portSize !== undefined) el.portSize = pe.portSize;
+        el.altColor = !!pe.altColor;
+      }
+    }
+    renderPosterTexture();
+    buildElementControls();
+  }
+
+  // --- Shapes ---
+  // Handle 0-shape presets
+  if (shapeDataArr.length === 0 || (shapeDataArr.length === 1 && Object.keys(shapeDataArr[0]).length === 0 && p.shapes && p.shapes.length === 0)) {
+    shapes.length = 0;
+    selectedIdx = 0;
+    rebuildShapeBar();
+    return;
+  }
+
+  // Recreate shapes array from preset
+  const newShapes = shapeDataArr.map((sd, i) => {
+    const base = i < shapes.length ? shapes[i] : createShape();
+    return base;
+  });
+  // If preset has fewer shapes than current, trim
+  shapes.length = newShapes.length;
+  for (let i = 0; i < newShapes.length; i++) {
+    if (!shapes[i]) shapes[i] = createShape();
+  }
+  selectedIdx = Math.min(selectedIdx, Math.max(0, shapes.length - 1));
+
+  // Tween each shape's numeric values
+  for (let i = 0; i < shapeDataArr.length; i++) {
+    const sd = shapeDataArr[i];
+    const shape = shapes[i];
+    const shapeTween = {};
+    for (const [k, v] of Object.entries(sd)) {
+      if (k === 'ringShape') { shape.ringShape = v; continue; }
+      if (k === 'flowDir') { shape.flowDir = v; continue; }
+      if (typeof v === 'number' && shape.hasOwnProperty(k)) {
+        shapeTween[k] = v;
+      }
+    }
+    gsap.to(shape, {
+      ...shapeTween,
+      duration: 1,
+      ease: 'power2.inOut',
+      onUpdate: () => {
+        if (i === selectedIdx && shapes[i]) syncUIToShape(shapes[i]);
+      },
+    });
+  }
+
+  // Update discrete UI
+  if (sel()) syncUIToShape(sel());
+  rebuildShapeBar();
+}
+
+// Render preset buttons
+const presetContainer = document.getElementById('presetButtons');
+for (const name of Object.keys(BUILTIN_PRESETS)) {
+  const btn = document.createElement('button');
+  btn.textContent = name;
+  btn.style.cssText = 'background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:4px;padding:4px 8px;font-family:inherit;font-size:10px;color:#ccc;cursor:pointer;';
+  btn.addEventListener('click', () => loadPreset(name));
+  btn.addEventListener('mouseenter', () => btn.style.background = 'rgba(255,255,255,0.15)');
+  btn.addEventListener('mouseleave', () => btn.style.background = 'rgba(255,255,255,0.08)');
+  presetContainer.appendChild(btn);
+}
+
+// Save current state as preset
+document.getElementById('savePresetBtn').addEventListener('click', () => {
+  const toHex = (rgb) => '#' + rgb.map(c => Math.round(c*255).toString(16).padStart(2,'0')).join('');
+  const preset = {
+    global: {
+      bgColor: toHex(G.bgColor),
+      lineColor: toHex(G.lineColor),
+      posterColor: toHex(G.posterColor),
+      posterColor2: toHex(G.posterColor2),
+      bloomIntensity: +G.bloomIntensity.toFixed(3),
+      chromaticAberration: +G.chromaticAberration.toFixed(4),
+      vignette: +G.vignette.toFixed(2),
+      grain: +G.grain.toFixed(3),
+      flatMode: G.flatMode,
+      posterBlur: +G.posterBlur.toFixed(4),
+      posterThreshold: +G.posterThreshold.toFixed(0),
+      posterScale: +G.posterScale.toFixed(2),
+      videoScale: +G.videoScale.toFixed(2),
+      ...(G.videoScalePort != null ? { videoScalePort: +G.videoScalePort.toFixed(2) } : {}),
+    },
+    shapes: shapes.map(s => ({
+      ringWidth: +s.ringWidth.toFixed(1), meridianWidth: +s.meridianWidth.toFixed(1),
+      ringAlpha: +s.ringAlpha.toFixed(2), meridianAlpha: +s.meridianAlpha.toFixed(2),
+      glowIntensity: +s.glowIntensity.toFixed(1), glowFalloff: +s.glowFalloff.toFixed(1),
+      flowSpeed: +s.flowSpeed.toFixed(2), flowDir: s.flowDir, ringCount: s.ringCount,
+      ringShape: s.ringShape, throatRadius: +s.throatRadius.toFixed(2), throatScale: +s.throatScale.toFixed(2),
+      funnelExtent: +s.funnelExtent.toFixed(1), discWidth: +s.discWidth.toFixed(1), meridians: s.meridians,
+      scale: +s.scale.toFixed(2), x: +s.x.toFixed(2), y: +s.y.toFixed(2), z: +s.z.toFixed(2),
+      rotX: +s.rotX.toFixed(3), rotY: +s.rotY.toFixed(3),
+    })),
+    posterElements: posterElements.map(el => ({
+      id: el.id, x: +el.x.toFixed(4), y: +el.y.toFixed(4), size: +el.size.toFixed(4),
+      ...(el.midX != null ? { midX: +el.midX.toFixed(4) } : {}),
+      ...(el.midY != null ? { midY: +el.midY.toFixed(4) } : {}),
+      ...(el.midSize != null ? { midSize: +el.midSize.toFixed(4) } : {}),
+      ...(el.portX != null ? { portX: +el.portX.toFixed(4) } : {}),
+      ...(el.portY != null ? { portY: +el.portY.toFixed(4) } : {}),
+      ...(el.portSize != null ? { portSize: +el.portSize.toFixed(4) } : {}),
+      ...(el.altColor ? { altColor: true } : {}),
+    })),
+  };
+  console.log('Preset JSON:\n' + JSON.stringify(preset, null, 2));
+  navigator.clipboard.writeText(JSON.stringify(preset, null, 2)).then(() => {
+    const btn = document.getElementById('savePresetBtn');
+    btn.textContent = 'Copied to clipboard!';
+    setTimeout(() => btn.textContent = 'Save Current as Preset', 2000);
+  }).catch(() => {});
+});
+
+// === RESIZE ===
+function resize() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  const vw = window.visualViewport ? window.visualViewport.width : window.innerWidth;
+  const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  canvas.width = vw * dpr;
+  canvas.height = vh * dpr;
+  canvas.style.width = vw + 'px';
+  canvas.style.height = vh + 'px';
+}
+window.addEventListener('resize', resize);
+if (window.visualViewport) window.visualViewport.addEventListener('resize', resize);
+resize();
+
+// === SHADER UTILS ===
+function compileShader(type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+    console.error('Shader compile error:', gl.getShaderInfoLog(s)); return null;
+  }
+  return s;
+}
+function createProgram(vs, fs) {
+  const p = gl.createProgram();
+  const vShader = compileShader(gl.VERTEX_SHADER, vs);
+  const fShader = compileShader(gl.FRAGMENT_SHADER, fs);
+  if (!vShader || !fShader) return null;
+  gl.attachShader(p, vShader);
+  gl.attachShader(p, fShader);
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
+    console.error('Program link error:', gl.getProgramInfoLog(p)); return null;
+  }
+  return p;
+}
+function getUniforms(prog, ...names) {
+  const u = {};
+  for (const n of names) u[n] = gl.getUniformLocation(prog, n);
+  return u;
+}
+
+// === LINE SHADER (expanded quads with SDF glow) ===
+const lineVS = `#version 300 es
+layout(location=0) in vec3 a_posA;
+layout(location=1) in vec3 a_posB;
+layout(location=2) in float a_side;
+layout(location=3) in float a_alpha;
+
+uniform mat4 u_mvp;
+uniform vec2 u_resolution;
+uniform float u_thickness;
+
+out float v_dist;
+out float v_alpha;
+
+void main() {
+  vec4 clipA = u_mvp * vec4(a_posA, 1.0);
+  vec4 clipB = u_mvp * vec4(a_posB, 1.0);
+
+  vec2 ndcA = clipA.xy / clipA.w;
+  vec2 ndcB = clipB.xy / clipB.w;
+
+  vec2 dir = normalize((ndcB - ndcA) * u_resolution);
+  vec2 normal = vec2(-dir.y, dir.x);
+
+  float expand = u_thickness * 3.0;
+
+  float endpointSel = step(0.5, fract(abs(a_side) * 0.5));
+  vec4 baseClip = mix(clipA, clipB, endpointSel);
+  float sideSign = sign(a_side);
+
+  vec2 ndcBase = baseClip.xy / baseClip.w;
+  vec2 finalNDC = ndcBase + normal * (expand / u_resolution) * sideSign;
+
+  gl_Position = vec4(finalNDC * baseClip.w, baseClip.z, baseClip.w);
+  v_dist = sideSign * expand;
+  v_alpha = a_alpha;
+}`;
+
+const lineFS = `#version 300 es
+precision highp float;
+
+in float v_dist;
+in float v_alpha;
+
+uniform vec3 u_color;
+uniform float u_thickness;
+uniform float u_glowIntensity;
+uniform float u_glowFalloff;
+
+out vec4 fragColor;
+
+void main() {
+  float d = abs(v_dist);
+  float halfWidth = u_thickness * 0.5;
+
+  float core = 1.0 - smoothstep(halfWidth - 1.0, halfWidth + 1.0, d);
+  float glow = exp(-d * u_glowFalloff / u_thickness) * u_glowIntensity;
+
+  float intensity = core + glow * 0.5;
+  fragColor = vec4(u_color * intensity * v_alpha, intensity * v_alpha);
+}`;
+
+// === POST-PROCESSING SHADER ===
+const quadVS = `#version 300 es
+layout(location=0) in vec2 a_pos;
+out vec2 v_uv;
+void main() {
+  v_uv = a_pos * 0.5 + 0.5;
+  gl_Position = vec4(a_pos, 0.0, 1.0);
+}`;
+
+const compositeFS = `#version 300 es
+precision highp float;
+in vec2 v_uv;
+uniform sampler2D u_scene;
+uniform sampler2D u_bloom;
+uniform float u_bloomIntensity;
+uniform float u_chromaticAberration;
+uniform float u_vignette;
+uniform float u_grain;
+uniform float u_grainScale;
+uniform float u_time;
+uniform vec3 u_bgColor;
+uniform float u_masterOpacity;
+uniform float u_flatMode;
+uniform sampler2D u_poster;
+uniform sampler2D u_video;
+uniform vec3 u_lineColor;
+uniform vec3 u_posterColor;
+uniform vec3 u_posterColor2;
+uniform float u_posterReady;
+uniform float u_posterThreshold;
+uniform float u_posterReveal;
+uniform float u_revealBlurMax;
+uniform float u_revealThreshStart;
+uniform float u_exportRangeExpand;
+uniform float u_posterAspect;
+uniform float u_videoReady;
+uniform float u_videoAspect;
+uniform float u_videoScale;
+uniform sampler2D u_video2;
+uniform float u_video2Ready;
+uniform float u_video2Aspect;
+uniform float u_screenAspect;
+out vec4 fragColor;
+
+// Integer-based hash — no sin() precision issues, no spatial correlation
+float hash(vec2 p) {
+  uvec2 q = uvec2(floatBitsToUint(p.x), floatBitsToUint(p.y));
+  uint n = q.x ^ (q.y * 747796405u);
+  n = ((n >> 16u) ^ n) * 2654435769u;
+  n = ((n >> 16u) ^ n) * 2654435769u;
+  return float(n) / 4294967295.0;
+}
+
+void main() {
+  vec2 uv = v_uv;
+  vec2 center = uv - 0.5;
+  float dist = length(center);
+
+  // Sample scene
+  vec3 scene;
+  // Collect overlay masks
+  float videoMask = 0.0;
+  // Video 2 — full screen cover
+  if (u_video2Ready > 0.5) {
+    vec2 v2uv = uv;
+    float v2Ratio = u_screenAspect / u_video2Aspect;
+    if (v2Ratio > 1.0) { v2uv.y = (v2uv.y - 0.5) / v2Ratio + 0.5; }
+    else { v2uv.x = (v2uv.x - 0.5) * v2Ratio + 0.5; }
+    v2uv = clamp(v2uv, 0.0, 1.0);
+    vec4 vid2 = texture(u_video2, v2uv);
+    float v2gray = dot(vid2.rgb, vec3(0.299, 0.587, 0.114));
+    videoMask = smoothstep(0.45, 0.35, v2gray);
+  }
+  // Video 1 — positioned/scaled, composited on top
+  if (u_videoReady > 0.5) {
+    vec2 vuv = (uv - 0.5) / u_videoScale + 0.5;
+    float vRatio = u_screenAspect / u_videoAspect;
+    if (vRatio > 1.0) { vuv.y = (vuv.y - 0.5) / vRatio + 0.5; }
+    else { vuv.x = (vuv.x - 0.5) * vRatio + 0.5; }
+    if (vuv.x >= 0.0 && vuv.x <= 1.0 && vuv.y >= 0.0 && vuv.y <= 1.0) {
+      vec4 vid = texture(u_video, vuv);
+      float vgray = dot(vid.rgb, vec3(0.299, 0.587, 0.114));
+      float v1mask = smoothstep(0.45, 0.35, vgray);
+      videoMask = max(videoMask, v1mask);
+    }
+  }
+
+  float posterMask = 0.0;
+  float posterAltMask = 0.0;
+  if (u_posterReady > 0.5 && u_posterReveal > 0.001) {
+    // Animated blur: sample poster at offset UVs during reveal
+    float blurAmount = (1.0 - u_posterReveal) * u_revealBlurMax;
+    vec4 poster;
+    if (blurAmount > 0.001) {
+      // 9-tap box blur for cheap animated blur
+      vec2 px = vec2(blurAmount, blurAmount * u_screenAspect);
+      poster = texture(u_poster, uv) * 0.25
+        + texture(u_poster, uv + vec2( px.x, 0.0)) * 0.125
+        + texture(u_poster, uv + vec2(-px.x, 0.0)) * 0.125
+        + texture(u_poster, uv + vec2(0.0,  px.y)) * 0.125
+        + texture(u_poster, uv + vec2(0.0, -px.y)) * 0.125
+        + texture(u_poster, uv + vec2( px.x,  px.y)) * 0.0625
+        + texture(u_poster, uv + vec2(-px.x,  px.y)) * 0.0625
+        + texture(u_poster, uv + vec2( px.x, -px.y)) * 0.0625
+        + texture(u_poster, uv + vec2(-px.x, -px.y)) * 0.0625;
+    } else {
+      poster = texture(u_poster, uv);
+    }
+    float gray = dot(poster.rgb, vec3(0.299, 0.587, 0.114));
+    // Animate threshold: sweep from start to target
+    float tTarget = u_posterThreshold;
+    float tAnim = mix(u_revealThreshStart, tTarget, u_posterReveal);
+    float fw = fwidth(gray) * 1.5 + 0.005;
+    float totalMask = smoothstep(tAnim + fw, tAnim - fw, gray);
+    // Blue vs black detection
+    float blueExcess = poster.b - max(poster.r, poster.g);
+    float isAltBool = step(0.05, blueExcess);
+    posterAltMask = totalMask * isAltBool;
+    posterMask = totalMask * (1.0 - isAltBool);
+  }
+
+  if (u_flatMode > 0.5) {
+    vec4 sceneRGBA = texture(u_scene, uv);
+    float sceneMask = min(sceneRGBA.a * u_masterOpacity, 1.0);
+
+    float lineMask = sceneMask + videoMask - 2.0 * sceneMask * videoMask;
+    float totalPoster = posterMask + posterAltMask;
+    float lBin = step(0.5, lineMask);
+    float pBin = step(0.5, totalPoster);
+    float p2Bin = step(0.5, posterAltMask);
+    float lOnly = lBin * (1.0 - pBin);
+    float pOnly = step(0.5, posterMask) * (1.0 - lBin);
+    float p2Only = p2Bin * (1.0 - lBin);
+    vec3 posterCol = u_posterColor * pOnly + u_posterColor2 * p2Only;
+    vec3 solidCol = u_lineColor * lOnly + posterCol + u_bgColor * (1.0 - lOnly - pOnly - p2Only);
+    float edgeAA = clamp(max(lineMask, totalPoster), 0.0, 1.0);
+    vec3 col = mix(u_bgColor, solidCol, edgeAA);
+
+    col *= 1.0 - u_vignette * dist * dist * 0.3;
+
+    float t1f = floor(u_time * 24.0);
+    float t2f = t1f + 1.0;
+    float tff = fract(u_time * 24.0);
+    vec2 grainCoord = floor(gl_FragCoord.xy / u_grainScale) * u_grainScale;
+    float g1f = hash(grainCoord + mod(t1f, 100.0) * 7.23) - 0.5;
+    float g2f = hash(grainCoord + mod(t2f, 100.0) * 7.23) - 0.5;
+    col += mix(g1f, g2f, tff * tff * (3.0 - 2.0 * tff)) * u_grain;
+
+    // Pre-expand for H.264 limited range (16-235) during export
+    if (u_exportRangeExpand > 0.5) {
+      col = (col - 16.0/255.0) * (255.0/219.0);
+    }
+    fragColor = vec4(col, 1.0);
+  } else {
+    float ca = u_chromaticAberration * dist;
+    float r = texture(u_scene, uv + center * ca).r;
+    float g = texture(u_scene, uv).g;
+    float b = texture(u_scene, uv - center * ca).b;
+    vec3 col = vec3(r, g, b);
+
+    vec3 bloom = texture(u_bloom, uv).rgb;
+    col += bloom * u_bloomIntensity;
+
+    float sceneMask = min(length(col) * u_masterOpacity, 1.0);
+
+    col *= u_masterOpacity;
+    col += u_bgColor * (1.0 - min(1.0, (col.r + col.g + col.b) * 2.0));
+    col *= 1.0 - u_vignette * dist * dist;
+    col = 1.0 - exp(-col * 2.0);
+
+    float lineMask = sceneMask + videoMask - 2.0 * sceneMask * videoMask;
+    float totalPoster2 = posterMask + posterAltMask;
+    float lBin = step(0.5, lineMask);
+    float pBin2 = step(0.5, totalPoster2);
+    float p2Bin2 = step(0.5, posterAltMask);
+    float lOnly2 = lBin * (1.0 - pBin2);
+    float pOnly2 = step(0.5, posterMask) * (1.0 - lBin);
+    float p2Only2 = p2Bin2 * (1.0 - lBin);
+    vec3 posterCol2 = u_posterColor * pOnly2 + u_posterColor2 * p2Only2;
+    vec3 solidCol = u_lineColor * lOnly2 + posterCol2 + u_bgColor * (1.0 - lOnly2 - pOnly2 - p2Only2);
+    float edgeAA = clamp(max(lineMask, totalPoster2), 0.0, 1.0);
+    col = mix(u_bgColor, solidCol, edgeAA);
+
+    float t1 = floor(u_time * 24.0);
+    float t2 = t1 + 1.0;
+    float tf = fract(u_time * 24.0);
+    vec2 grainCoord2 = floor(gl_FragCoord.xy / u_grainScale) * u_grainScale;
+    float g1 = hash(grainCoord2 + mod(t1, 100.0) * 7.23) - 0.5;
+    float g2 = hash(grainCoord2 + mod(t2, 100.0) * 7.23) - 0.5;
+    float grainVal = mix(g1, g2, tf * tf * (3.0 - 2.0 * tf)) * u_grain;
+    col += grainVal;
+
+    // Pre-expand for H.264 limited range (16-235) during export
+    if (u_exportRangeExpand > 0.5) {
+      col = (col - 16.0/255.0) * (255.0/219.0);
+    }
+    fragColor = vec4(col, 1.0);
+  }
+}`;
+
+const blurFS = `#version 300 es
+precision highp float;
+in vec2 v_uv;
+uniform sampler2D u_tex;
+uniform vec2 u_dir;
+out vec4 fragColor;
+
+void main() {
+  vec3 col = vec3(0.0);
+  float weights[5] = float[](0.227027, 0.1945946, 0.1216216, 0.054054, 0.016216);
+  col += texture(u_tex, v_uv).rgb * weights[0];
+  for (int i = 1; i < 5; i++) {
+    vec2 off = u_dir * float(i) * 2.0;
+    col += texture(u_tex, v_uv + off).rgb * weights[i];
+    col += texture(u_tex, v_uv - off).rgb * weights[i];
+  }
+  fragColor = vec4(col, 1.0);
+}`;
+
+// === COMPILE PROGRAMS ===
+const lineProg = createProgram(lineVS, lineFS);
+const lineU = getUniforms(lineProg, 'u_mvp', 'u_resolution', 'u_thickness', 'u_color', 'u_glowIntensity', 'u_glowFalloff');
+
+const compositeProg = createProgram(quadVS, compositeFS);
+const compU = getUniforms(compositeProg, 'u_scene', 'u_bloom', 'u_poster', 'u_video', 'u_bloomIntensity', 'u_chromaticAberration', 'u_vignette', 'u_grain', 'u_grainScale', 'u_time', 'u_bgColor', 'u_lineColor', 'u_posterColor', 'u_posterColor2', 'u_masterOpacity', 'u_flatMode', 'u_posterReady', 'u_posterThreshold', 'u_posterReveal', 'u_revealBlurMax', 'u_revealThreshStart', 'u_exportRangeExpand', 'u_posterAspect', 'u_videoReady', 'u_videoAspect', 'u_videoScale', 'u_video2', 'u_video2Ready', 'u_video2Aspect', 'u_screenAspect');
+
+const blurProg = createProgram(quadVS, blurFS);
+const blurU = getUniforms(blurProg, 'u_tex', 'u_dir');
+
+// === FRAMEBUFFERS ===
+let sceneFBO, bloomFBO1, bloomFBO2;
+
+function createFBO(w, h) {
+  const tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+  const fbo = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  return { fbo, tex, w, h };
+}
+
+function setupFBOs() {
+  const w = canvas.width, h = canvas.height;
+  sceneFBO = createFBO(w, h);
+  bloomFBO1 = createFBO(w >> 1, h >> 1);
+  bloomFBO2 = createFBO(w >> 1, h >> 1);
+}
+setupFBOs();
+window.addEventListener('resize', () => { resize(); setupFBOs(); });
+
+// Fullscreen quad buffer
+const quadBuf = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+
+// === DYNAMIC POSTER TEXTURE ===
+let posterTex = null;
+let posterReady = false;
+let posterAspect = 1;
+const posterCanvas = document.createElement('canvas');
+const posterCtx = posterCanvas.getContext('2d', { willReadFrequently: true });
+const raLogo = new Image();
+raLogo.src = 'assets/ra-logo.png';
+const reLogo = new Image();
+reLogo.src = 'assets/re-logo.svg';
+const radio28Logo = new Image();
+radio28Logo.src = 'assets/radio28-logo.svg';
+const vinylEventLogo = new Image();
+vinylEventLogo.src = 'assets/vinyl-event.svg';
+
+const posterElements = [
+  { id: 'danaruh',    text: 'DANA RUH', font: 'VG5000', size: 0.14, x: 0.5, y: 0.38, align: 'center', portX: 0.5, portY: 0.12, portSize: null, weight: 0.02 },
+  { id: 'brouquade',  text: '(BERLIN / BROUQUADE, KMA60)', font: 'Aeonik', size: 0.0168, x: 0.5, y: 0.405, align: 'center', portX: 0.5, portY: 0.19, portSize: null },
+  { id: 'zepha',      text: 'ZEPHA', font: 'VG5000', size: 0.14, x: 0.5, y: 0.52, align: 'center', portX: 0.55, portY: 0.35, portSize: null, weight: 0.02 },
+  { id: 'diewell',    text: '(DIE WELL)', font: 'Aeonik', size: 0.0168, x: 0.5, y: 0.545, align: 'center', portX: 0.55, portY: 0.42, portSize: null },
+  { id: 'supportlbl', text: 'Support', font: 'Aeonik', size: 0.024, x: 0.5, y: 0.59, align: 'left', portX: 0.5, portY: 0.48, portSize: null },
+  { id: 'support',    text: 'LOST KIDD b2b SOTRES', font: 'VG5000', size: 0.04, x: 0.5, y: 0.64, align: 'center', portX: 0.5, portY: 0.53, portSize: null, weight: 0.02 },
+  { id: 'ritmo',      text: '(RITMO ENIGMA)', font: 'Aeonik', size: 0.0147, x: 0.5, y: 0.652, align: 'center', portX: 0.5, portY: 0.57, portSize: null },
+  { id: 'abril',      text: 'ABRIL 11', font: 'VG5000', size: 0.035, x: 0.95, y: 0.92, align: 'right', portX: 0.5, portY: 0.78, portSize: null, weight: 0.02 },
+  { id: 'direccion',  text: 'Av. 10 Oriente 9-A, San Andres Cholula', font: 'Aeonik', size: 0.012, x: 0.95, y: 0.94, align: 'right', portX: 0.5, portY: 0.81, portSize: null },
+  { id: 'entradas',   text: 'EARLY 100\nPUERTA 150', font: 'Aeonik', size: 0.014, x: 0.95, y: 0.96, align: 'right', portX: 0.9, portY: 0.9, portSize: null },
+  { id: 'relogo',     text: '', font: '', size: 0.04, x: 0.5, y: 0.88, align: 'center', portX: 0.5, portY: 0.88, portSize: null, isLogo: 'reLogo' },
+  { id: 'radio28',    text: '', font: '', size: 0.03, x: 0.5, y: 0.96, align: 'center', portX: 0.5, portY: 0.93, portSize: null, isLogo: 'radio28Logo' },
+  { id: 'vinylevent', text: '', font: '', size: 0.03, x: 0.15, y: 0.96, align: 'center', portX: 0.15, portY: 0.93, portSize: null, isLogo: 'vinylEventLogo' },
+];
+
+let posterBBoxes = [];
+let posterEditMode = false;
+let audioMuted = false;
+let muteIconBBox = null;
+let posterGapCenter = 0.4;
+buildElementControls();
+let posterDragIdx = -1;
+let posterDragOffX = 0, posterDragOffY = 0;
+
+function renderPosterTexture(fastMode) {
+  const w = canvas.width, h = canvas.height;
+  posterCanvas.width = w;
+  posterCanvas.height = h;
+  posterAspect = w / h;
+  const ctx = posterCtx;
+
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, w, h);
+
+  const supportsFilter = typeof ctx.filter === 'string';
+  if (!fastMode && supportsFilter) {
+    const s = Math.sqrt(w * h);
+    const blurAmount = Math.max(0.5, s * G.posterBlur);
+    ctx.filter = `blur(${blurAmount}px)`;
+  }
+  ctx.fillStyle = '#000';
+
+  posterBBoxes = [];
+
+  const gScale = G.posterScale;
+  const base = Math.sqrt(w * h);
+  const aspect = w / h;
+  const isPortrait = h > w;
+  // Three-point blend: desktop (>=1.4) → mid/4:5 (0.8) → portrait/9:16 (<=0.56)
+  const deskToMid = Math.max(0, Math.min(1, (1.4 - aspect) / (1.4 - 0.8)));
+  const midToPort = Math.max(0, Math.min(1, (0.8 - aspect) / (0.8 - 0.56)));
+  // Legacy portBlend for yBase/yOff (overall vertical adjustment)
+  const portBlend = Math.max(0, Math.min(1, (1.4 - aspect) / (1.4 - 0.56)));
+
+  function blendVal(desk, mid, port) {
+    if (mid == null) {
+      // No mid value: blend desk→port directly
+      const t = Math.max(0, Math.min(1, (1.4 - aspect) / (1.4 - 0.56)));
+      return desk + ((port != null ? port : desk) - desk) * t;
+    }
+    if (aspect >= 0.8) {
+      return desk + (mid - desk) * deskToMid;
+    } else {
+      return mid + ((port != null ? port : mid) - mid) * midToPort;
+    }
+  }
+
+  const yBase = h * (1 + 0.05 * portBlend);
+  const yOff = -h * 0.1 * portBlend;
+  const elPositions = {};
+  for (let ei = 0; ei < posterElements.length; ei++) {
+    const el = posterElements[ei];
+    if (el.id === 'entradas' && raLogo.complete && raLogo.naturalWidth) continue;
+    if (el.isLogo) continue; // rendered separately
+    const elSize = blendVal(el.size, el.midSize, el.portSize);
+    const fontSize = base * elSize * gScale;
+    ctx.font = `${fontSize}px ${el.font}`;
+    ctx.textAlign = el.align;
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = el.altColor ? '#0000FF' : '#000';
+
+    const deskPx = w * el.x;
+    const deskPy = h * el.y;
+
+    let px, py;
+    const mx = el.midX != null ? w * el.midX : null;
+    const my = el.midY != null ? h * el.midY : null;
+    const portPx = el.portX != null ? w * el.portX : null;
+    const portPy = el.portY != null ? h * el.portY : null;
+    if (mx != null || portPx != null) {
+      px = blendVal(deskPx, mx, portPx);
+      py = blendVal(deskPy, my, portPy);
+    } else {
+      px = deskPx;
+      py = deskPy;
+    }
+
+    // Clamp to keep text within canvas
+    const textW = ctx.measureText(el.text).width;
+    const pad = w * 0.02;
+    if (el.align === 'center') {
+      px = Math.max(textW / 2 + pad, Math.min(w - textW / 2 - pad, px));
+    } else if (el.align === 'left') {
+      px = Math.max(pad, Math.min(w - textW - pad, px));
+    } else if (el.align === 'right') {
+      px = Math.max(textW + pad, Math.min(w - pad, px));
+    }
+
+    if (el.weight) {
+      ctx.strokeStyle = ctx.fillStyle;
+      ctx.lineWidth = fontSize * el.weight;
+      ctx.lineJoin = 'round';
+      ctx.strokeText(el.text, px, py);
+    }
+    ctx.fillText(el.text, px, py);
+    elPositions[el.id] = { px, py, width: ctx.measureText(el.text).width };
+
+    const metrics = ctx.measureText(el.text);
+    let bx;
+    if (el.align === 'right') bx = px - metrics.width;
+    else if (el.align === 'center') bx = px - metrics.width / 2;
+    else bx = px;
+    posterBBoxes.push({
+      x: bx, y: py - fontSize * 0.85,
+      w: metrics.width, h: fontSize * 1.1,
+      elIdx: ei
+    });
+  }
+
+  // RA Tickets + RA logo — positioned together using entradas element
+  if (raLogo.complete && raLogo.naturalWidth) {
+    const entEl = posterElements.find(e => e.id === 'entradas');
+    const entSize = blendVal(entEl.size, entEl.midSize, entEl.portSize);
+    const fontSize = base * entSize * gScale;
+    ctx.font = `${fontSize}px ${entEl.font}`;
+    const logoH = fontSize * 0.55;
+    const logoW = logoH * (raLogo.naturalWidth / raLogo.naturalHeight);
+    // Compute blended position (three-point)
+    const deskEntX = w * entEl.x;
+    const deskEntY = h * entEl.y;
+    const emx = entEl.midX != null ? w * entEl.midX : null;
+    const emy = entEl.midY != null ? h * entEl.midY : null;
+    const epx = entEl.portX != null ? w * entEl.portX : null;
+    const epy = entEl.portY != null ? h * entEl.portY : null;
+    const entX = blendVal(deskEntX, emx, epx);
+    const entY = blendVal(deskEntY, emy, epy);
+    // Draw each line with RA logo + text
+    const lines = entEl.text.split('\n');
+    const lineHeight = fontSize * 1.3;
+    const startY = entY - (lines.length - 1) * lineHeight * 0.5;
+    let minBx = entX, totalH = 0;
+    for (let li = 0; li < lines.length; li++) {
+      const ly = startY + li * lineHeight;
+      ctx.textAlign = 'right';
+      ctx.fillStyle = entEl.altColor ? '#0000FF' : '#000';
+      if (li === 0) {
+        // First line: RA logo on left, then text to its right
+        const lm = ctx.measureText(lines[li]);
+        const totalW = logoW + fontSize * 0.3 + lm.width;
+        const logoLX = entX - totalW;
+        const textLeftEdge = logoLX + logoW + fontSize * 0.3;
+        ctx.textAlign = 'left';
+        ctx.fillText(lines[li], textLeftEdge, ly);
+        if (entEl.altColor) {
+          const tmp = document.createElement('canvas');
+          tmp.width = Math.ceil(logoW); tmp.height = Math.ceil(logoH);
+          const tc = tmp.getContext('2d');
+          tc.drawImage(raLogo, 0, 0, logoW, logoH);
+          tc.globalCompositeOperation = 'source-in';
+          tc.fillStyle = '#0000FF';
+          tc.fillRect(0, 0, logoW, logoH);
+          ctx.drawImage(tmp, logoLX, ly - fontSize * 0.65);
+        } else {
+          ctx.drawImage(raLogo, logoLX, ly - fontSize * 0.65, logoW, logoH);
+        }
+        if (logoLX < minBx) minBx = logoLX;
+      } else {
+        // Subsequent lines: text only, right-aligned to same edge
+        ctx.fillText(lines[li], entX, ly);
+        const lm = ctx.measureText(lines[li]);
+        const lbx = entX - lm.width;
+        if (lbx < minBx) minBx = lbx;
+      }
+    }
+    // Add bounding box for entradas (covers all lines + logos)
+    const entIdx = posterElements.indexOf(entEl);
+    posterBBoxes.push({
+      x: minBx, y: startY - fontSize * 0.85,
+      w: entX - minBx, h: lines.length * lineHeight + fontSize * 0.25,
+      elIdx: entIdx
+    });
+  }
+
+  // Logos — positioned via posterElements
+  const logoImages = { reLogo: reLogo, radio28Logo: radio28Logo, vinylEventLogo: vinylEventLogo };
+  for (let ei = 0; ei < posterElements.length; ei++) {
+    const el = posterElements[ei];
+    if (!el.isLogo) continue;
+    const img = logoImages[el.isLogo];
+    if (!img || !img.complete || !img.naturalWidth) continue;
+    const logoElSize = blendVal(el.size, el.midSize, el.portSize);
+    const logoS = base * logoElSize * gScale;
+    const logoAspect = img.naturalWidth / img.naturalHeight;
+    const logoW = logoS * logoAspect;
+    const logoH = logoS;
+    // Blended position (three-point)
+    const ldx = w * el.x, ldy = h * el.y;
+    const lmx = el.midX != null ? w * el.midX : null;
+    const lmy = el.midY != null ? h * el.midY : null;
+    const lpx = el.portX != null ? w * el.portX : null;
+    const lpy = el.portY != null ? h * el.portY : null;
+    const lx = blendVal(ldx, lmx, lpx);
+    const ly = blendVal(ldy, lmy, lpy);
+    const drawX = lx - logoW / 2;
+    const drawY = ly - logoH / 2;
+    if (el.altColor) {
+      // Recolor logo to blue via offscreen canvas
+      const tmp = document.createElement('canvas');
+      tmp.width = Math.ceil(logoW); tmp.height = Math.ceil(logoH);
+      const tc = tmp.getContext('2d');
+      tc.drawImage(img, 0, 0, logoW, logoH);
+      tc.globalCompositeOperation = 'source-in';
+      tc.fillStyle = '#0000FF';
+      tc.fillRect(0, 0, logoW, logoH);
+      ctx.drawImage(tmp, drawX, drawY);
+    } else {
+      ctx.drawImage(img, drawX, drawY, logoW, logoH);
+    }
+    // Bounding box for dragging
+    posterBBoxes.push({
+      x: drawX, y: drawY,
+      w: logoW, h: logoH,
+      elIdx: ei
+    });
+  }
+
+  if (supportsFilter) ctx.filter = 'none';
+
+  if (!fastMode && !supportsFilter && G.posterBlur > 0) {
+    const imgData = ctx.getImageData(0, 0, w, h);
+    const d = imgData.data;
+    const s = Math.sqrt(w * h);
+    const radius = Math.max(1, Math.round(s * G.posterBlur));
+    const tmp = new Uint8ClampedArray(d.length);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        let r = 0, g = 0, b = 0, count = 0;
+        for (let dx = -radius; dx <= radius; dx++) {
+          const sx = Math.min(w - 1, Math.max(0, x + dx));
+          const i = (y * w + sx) * 4;
+          r += d[i]; g += d[i+1]; b += d[i+2]; count++;
+        }
+        const i = (y * w + x) * 4;
+        tmp[i] = r / count; tmp[i+1] = g / count; tmp[i+2] = b / count; tmp[i+3] = 255;
+      }
+    }
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        let r = 0, g = 0, b = 0, count = 0;
+        for (let dy = -radius; dy <= radius; dy++) {
+          const sy = Math.min(h - 1, Math.max(0, y + dy));
+          const i = (sy * w + x) * 4;
+          r += tmp[i]; g += tmp[i+1]; b += tmp[i+2]; count++;
+        }
+        const i = (y * w + x) * 4;
+        d[i] = r / count; d[i+1] = g / count; d[i+2] = b / count;
+      }
+    }
+    ctx.putImageData(imgData, 0, 0);
+  }
+
+  // Draw speaker/mute icon (web only, skip during export)
+  if (!isExporting) {
+    ctx.filter = 'none';
+    ctx.fillStyle = '#000';
+    ctx.strokeStyle = '#000';
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const iconSize = 24 * dpr;
+    const pad = 16 * dpr;
+    const ix = pad;
+    const iy = h - pad - iconSize;
+    const s = iconSize / 24; // scale factor
+    ctx.save();
+    ctx.translate(ix, iy);
+    ctx.scale(s, s);
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    // Speaker body
+    ctx.beginPath();
+    ctx.moveTo(11, 5); ctx.lineTo(6, 9); ctx.lineTo(2, 9);
+    ctx.lineTo(2, 15); ctx.lineTo(6, 15); ctx.lineTo(11, 19);
+    ctx.closePath();
+    ctx.fill();
+    if (!audioMuted) {
+      // Sound waves
+      ctx.beginPath();
+      ctx.arc(12, 12, 5, -Math.PI * 0.36, Math.PI * 0.36);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(12, 12, 10, -Math.PI * 0.4, Math.PI * 0.4);
+      ctx.stroke();
+    } else {
+      // X mark
+      ctx.beginPath();
+      ctx.moveTo(16, 9); ctx.lineTo(22, 15);
+      ctx.moveTo(22, 9); ctx.lineTo(16, 15);
+      ctx.stroke();
+    }
+    ctx.restore();
+    // Store bounding box for click detection (in CSS pixels)
+    muteIconBBox = { x: pad / dpr, y: (h - pad - iconSize) / dpr, w: iconSize / dpr, h: iconSize / dpr };
+  }
+
+  if (posterEditMode) {
+    ctx.filter = 'none';
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([4, 4]);
+    for (const bb of posterBBoxes) {
+      ctx.strokeRect(bb.x, bb.y, bb.w, bb.h);
+    }
+    ctx.setLineDash([]);
+  }
+
+  if (!posterTex) {
+    posterTex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, posterTex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  } else {
+    gl.bindTexture(gl.TEXTURE_2D, posterTex);
+  }
+  try {
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, posterCanvas);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    posterReady = true;
+  } catch(e) { posterReady = false; }
+
+  if (isPortrait && posterBBoxes.length > 0) {
+    const bands = posterBBoxes.map(bb => ({ top: bb.y, bottom: bb.y + bb.h }));
+    bands.sort((a, b) => a.top - b.top);
+    const merged = [bands[0]];
+    for (let i = 1; i < bands.length; i++) {
+      const prev = merged[merged.length - 1];
+      if (bands[i].top <= prev.bottom) {
+        prev.bottom = Math.max(prev.bottom, bands[i].bottom);
+      } else {
+        merged.push({ top: bands[i].top, bottom: bands[i].bottom });
+      }
+    }
+    let bestGap = 0, bestCenter = h * 0.4;
+    if (merged[0].top > bestGap) { bestGap = merged[0].top; bestCenter = merged[0].top / 2; }
+    for (let i = 1; i < merged.length; i++) {
+      const gap = merged[i].top - merged[i - 1].bottom;
+      if (gap > bestGap) {
+        bestGap = gap;
+        bestCenter = (merged[i - 1].bottom + merged[i].top) / 2;
+      }
+    }
+    const bottomGap = h - merged[merged.length - 1].bottom;
+    if (bottomGap > bestGap) { bestGap = bottomGap; bestCenter = (merged[merged.length - 1].bottom + h) / 2; }
+    posterGapCenter = bestCenter / h;
+  } else {
+    posterGapCenter = 0.5;
+  }
+}
+
+// --- Poster drag interaction ---
+function posterHitTest(mx, my) {
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  const px = mx * dpr, py = my * dpr;
+  for (let i = posterBBoxes.length - 1; i >= 0; i--) {
+    const bb = posterBBoxes[i];
+    if (px >= bb.x && px <= bb.x + bb.w && py >= bb.y && py <= bb.y + bb.h) return i;
+  }
+  return -1;
+}
+
+function posterDragStart(clientX, clientY, shiftKey) {
+  if (!posterEditMode) return false;
+  const bbIdx = posterHitTest(clientX, clientY);
+  if (bbIdx < 0) return false;
+  posterDragIdx = posterBBoxes[bbIdx].elIdx;
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  const el = posterElements[posterDragIdx];
+  const aspect = canvas.width / canvas.height;
+  const mode = aspect >= 1.4 ? 'desk' : (aspect >= 0.56 ? 'mid' : 'port');
+  const ex = mode === 'port' ? (el.portX != null ? el.portX : el.x) :
+             mode === 'mid' ? (el.midX != null ? el.midX : el.x) : el.x;
+  const ey = mode === 'port' ? (el.portY != null ? el.portY : el.y) :
+             mode === 'mid' ? (el.midY != null ? el.midY : el.y) : el.y;
+  posterDragOffX = clientX * dpr - canvas.width * ex;
+  posterDragOffY = clientY * dpr - canvas.height * ey;
+  return true;
+}
+
+function posterDragMove(clientX, clientY, shiftKey) {
+  if (posterDragIdx < 0) return;
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  const el = posterElements[posterDragIdx];
+  const aspect = canvas.width / canvas.height;
+  // Determine which set of coords to edit based on current aspect
+  // >= 1.1: desktop, 0.65-1.1: mid (4:5), < 0.65: portrait (9:16)
+  const mode = aspect >= 1.4 ? 'desk' : (aspect >= 0.56 ? 'mid' : 'port');
+  const newX = (clientX * dpr - posterDragOffX) / canvas.width;
+  const newY = (clientY * dpr - posterDragOffY) / canvas.height;
+
+  function setCoords(target, nx, ny) {
+    if (mode === 'port') {
+      target.portX = nx;
+      target.portY = ny;
+    } else if (mode === 'mid') {
+      target.midX = nx;
+      target.midY = ny;
+    } else {
+      target.x = nx;
+      target.y = ny;
+    }
+  }
+
+  function getCoords(target) {
+    if (mode === 'port') return { x: target.portX != null ? target.portX : target.x, y: target.portY != null ? target.portY : target.y };
+    if (mode === 'mid') return { x: target.midX != null ? target.midX : target.x, y: target.midY != null ? target.midY : target.y };
+    return { x: target.x, y: target.y };
+  }
+
+  const cur = getCoords(el);
+  const dx = newX - cur.x;
+  const dy = newY - cur.y;
+  if (shiftKey) {
+    // Move all elements together
+    for (const other of posterElements) {
+      const oc = getCoords(other);
+      setCoords(other, oc.x + dx, oc.y + dy);
+    }
+  } else {
+    setCoords(el, newX, newY);
+  }
+  renderPosterTexture(true);
+}
+
+function posterDragEnd() {
+  if (posterDragIdx >= 0) {
+    posterDragIdx = -1;
+    renderPosterTexture(false);
+  }
+  posterDragIdx = -1;
+}
+
+// Mouse events
+canvas.addEventListener('mousedown', e => {
+  if (posterDragStart(e.clientX, e.clientY, e.shiftKey)) {
+    e.stopPropagation();
+    e.preventDefault();
+  }
+}, true);
+
+window.addEventListener('mousemove', e => {
+  posterDragMove(e.clientX, e.clientY, e.shiftKey);
+});
+
+// Touch events
+canvas.addEventListener('touchstart', e => {
+  if (!posterEditMode) return;
+  const t = e.touches[0];
+  if (posterDragStart(t.clientX, t.clientY, false)) {
+    e.stopPropagation();
+    e.preventDefault();
+  }
+}, { capture: true, passive: false });
+
+window.addEventListener('touchmove', e => {
+  if (posterDragIdx < 0) return;
+  const t = e.touches[0];
+  posterDragMove(t.clientX, t.clientY, false);
+  e.preventDefault();
+}, { passive: false });
+
+window.addEventListener('touchend', () => posterDragEnd());
+
+window.addEventListener('mouseup', () => posterDragEnd());
+
+// Explicitly load fonts, then render poster
+Promise.all([
+  new FontFace('VG5000', "url('assets/Fonts/VG5000-Regular_web.woff2') format('woff2'), url('assets/Fonts/VG5000-Regular_web.woff') format('woff')").load().then(f => document.fonts.add(f)),
+  new FontFace('Aeonik', "url('assets/Fonts/AeonikTRIAL-Medium.otf') format('opentype')").load().then(f => document.fonts.add(f)),
+  new FontFace('AeonikBlack', "url('assets/Fonts/AeonikTRIAL-Black.otf') format('opentype')").load().then(f => document.fonts.add(f)),
+]).then(() => {
+  loadPreset('DR5');
+  renderPosterTexture();
+  // Animate poster text reveal
+  playReveal();
+  let posterResizeTimer;
+  window.addEventListener('resize', () => {
+    renderPosterTexture(true);
+    clearTimeout(posterResizeTimer);
+    posterResizeTimer = setTimeout(() => renderPosterTexture(false), 200);
+  });
+}).catch(e => console.error('Font load failed:', e));
+
+// === VIDEO OVERLAY TEXTURE ===
+let videoTex = null;
+let videoReady = false;
+let videoAspect = 1;
+const overlayVideo = document.createElement('video');
+overlayVideo.loop = true;
+overlayVideo.muted = true;
+overlayVideo.defaultMuted = true;
+overlayVideo.playsInline = true;
+overlayVideo.autoplay = true;
+overlayVideo.setAttribute('playsinline', '');
+overlayVideo.setAttribute('webkit-playsinline', '');
+overlayVideo.setAttribute('muted', '');
+overlayVideo.setAttribute('autoplay', '');
+const srcMp4 = document.createElement('source');
+srcMp4.src = 'assets/bg-bitmap.mp4';
+srcMp4.type = 'video/mp4';
+const srcWebm = document.createElement('source');
+srcWebm.src = 'assets/bg-bitmap.webm';
+srcWebm.type = 'video/webm';
+overlayVideo.appendChild(srcMp4);
+overlayVideo.appendChild(srcWebm);
+overlayVideo.load();
+
+function initVideoTexture() {
+  if (videoReady) return;
+  videoAspect = overlayVideo.videoWidth / overlayVideo.videoHeight;
+  if (!videoAspect || !isFinite(videoAspect)) return;
+  videoTex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, videoTex);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  videoReady = true;
+}
+overlayVideo.addEventListener('canplay', () => {
+  initVideoTexture();
+  overlayVideo.play().catch(() => {});
+});
+overlayVideo.addEventListener('loadeddata', () => {
+  initVideoTexture();
+  overlayVideo.play().catch(() => {});
+});
+function videoPlayOnInteraction() {
+  if (overlayVideo.paused) overlayVideo.play().catch(() => {});
+  initVideoTexture();
+  if (overlayVideo2.paused) overlayVideo2.play().catch(() => {});
+  initVideo2Texture();
+}
+
+// === VIDEO 2 (full-screen background layer) ===
+let video2Ready = false;
+let video2Tex = null;
+let video2Aspect = 1;
+const overlayVideo2 = document.createElement('video');
+overlayVideo2.loop = true;
+overlayVideo2.muted = true;
+overlayVideo2.defaultMuted = true;
+overlayVideo2.playsInline = true;
+overlayVideo2.autoplay = true;
+overlayVideo2.setAttribute('playsinline', '');
+overlayVideo2.setAttribute('webkit-playsinline', '');
+overlayVideo2.setAttribute('muted', '');
+overlayVideo2.setAttribute('autoplay', '');
+const src2Mp4 = document.createElement('source');
+src2Mp4.src = 'assets/video2.mp4';
+src2Mp4.type = 'video/mp4';
+const src2Webm = document.createElement('source');
+src2Webm.src = 'assets/video2.webm';
+src2Webm.type = 'video/webm';
+overlayVideo2.appendChild(src2Mp4);
+overlayVideo2.appendChild(src2Webm);
+overlayVideo2.load();
+
+function initVideo2Texture() {
+  if (video2Ready) return;
+  video2Aspect = overlayVideo2.videoWidth / overlayVideo2.videoHeight;
+  if (!video2Aspect || !isFinite(video2Aspect)) return;
+  video2Tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, video2Tex);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  video2Ready = true;
+}
+overlayVideo2.addEventListener('canplay', () => {
+  initVideo2Texture();
+  overlayVideo2.play().catch(() => {});
+});
+overlayVideo2.addEventListener('loadeddata', () => {
+  initVideo2Texture();
+  overlayVideo2.play().catch(() => {});
+});
+document.addEventListener('touchstart', videoPlayOnInteraction, { passive: true });
+document.addEventListener('click', videoPlayOnInteraction);
+
+// === SVG SILHOUETTE LOADING ===
+let svgSilhouetteShape = null;
+
+function parseSVGPathToShape(pathD) {
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const tmpSvg = document.createElementNS(svgNS, 'svg');
+  tmpSvg.style.position = 'absolute';
+  tmpSvg.style.left = '-9999px';
+  const tmpPath = document.createElementNS(svgNS, 'path');
+  tmpPath.setAttribute('d', pathD);
+  tmpSvg.appendChild(tmpPath);
+  document.body.appendChild(tmpSvg);
+
+  const totalLen = tmpPath.getTotalLength();
+  const numPts = 200;
+  const pts = [];
+  for (let i = 0; i <= numPts; i++) {
+    const p = tmpPath.getPointAtLength((i / numPts) * totalLen);
+    pts.push([p.x, p.y]);
+  }
+  document.body.removeChild(tmpSvg);
+
+  let maxR = 0;
+  const cx = pts.reduce((s, p) => s + p[0], 0) / pts.length;
+  const cy = pts.reduce((s, p) => s + p[1], 0) / pts.length;
+  for (const p of pts) {
+    const r = Math.sqrt((p[0]-cx)**2 + (p[1]-cy)**2);
+    if (r > maxR) maxR = r;
+  }
+  const shape = pts.map(p => [(p[0]-cx)/maxR, -(p[1]-cy)/maxR]);
+  shape.push(shape[0].slice());
+  return shape;
+}
+
+function loadSVGSilhouette(url) {
+  fetch(url).then(r => r.text()).then(svgText => {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(svgText, 'image/svg+xml');
+    const pathEl = doc.querySelector('path');
+    if (!pathEl) { console.error('No path in SVG'); return; }
+    svgSilhouetteShape = parseSVGPathToShape(pathEl.getAttribute('d'));
+    console.log('SVG silhouette loaded from file:', svgSilhouetteShape.length, 'points');
+  }).catch(() => {
+    console.log('Fetch failed (likely file:// protocol), using inline SVG path data');
+    loadInlineSVG();
+  });
+}
+
+function loadInlineSVG() {
+  const pathD = "M342.28,1367.3c-.33-24.71-1.3-64.34-4.01-88.27.16-28.19-1.63-77.96-3.24-105.72.05-2.6-6.93-.72-8.77.74-2.74,2.19-2.88,6.01-3.26,9.95-4.76,20.16-3.25,159.98-3.66,183.7-3.81,5.17-2.45,10.54-3.94,16.15-9.37,24.14-10.02,63.43-8.69,90.39.14,7.53,2.76,14.1,4.92,20.91,1.99,6.25-1.42,13.63.99,19.61,6.48,24.23,7.23,51.67,1.76,76.29-5.69,22.64-8.6,44.65-10.14,67.79-3.6,27.24-10.74,92.35-8.92,119.18-.13,16.92,12.55,26.8,8.82,64.22-.53,5.3-7.84-1.68-4.7,36.44,6.05,24.6-3.7,28.25-25.72,30.87-6.82,1.71-11.15,9.91-19.17,9.96l-72.96.43c-3.39.02-3.21-4.46-3.97-6.08-5.18-11.2-.11-19.46,9.52-25.26,7.66-4.61,14.08-12.37,20.48-18.78,5.48-5.48,9.22-12.5,13.48-18.7,2.95-4.29.87-10.05,1.99-14.87,13.99-53.58.32-107.18-8.56-160.03.02.28-13.59-58.67-13.18-52.02l-.63-10.43c.36,5.93-13.86-41.83-14.13-71.62l-.53-57.42c.09,9.41,9.1-50.56,6.86-41.86,8.57-14.18,3.57-114.16.72-114.68,2.05-6.13-1.83-12.22-2.82-17.8-2.78-20.72-10.2-37.79-17.38-57.79-8.66-24.55-25.08-83.47-27.88-105.45,2.53-6.43-3.18-11.53-3.12-16.98-.2-19.98-3.28-39.97-7.09-59.27-1.56-26.83-1.19-53.28-.22-79.93,3.37-37.96,13.4-91.43,18.42-125.16,4.89-24.47,19.49-62.74,21.49-87.12-1.3-25.02,3.79-68.32.32-92.7-1.56-6.88,1.57-14.72-.74-21.46-1.99-5.8-3.86-10.67-3.28-17.17.37-4.17-3.46-7.87-3.42-12.16.07-8.07-1.79-38.03-8.19-40.39-5.71.24-14.71,25.51-15.78,30.91-3.47,12.77-10.17,26.48-12.51,39.51.24,32.28-5.31,75.84-17.59,107.66-5.93,22.7-16.86,38.45-29.15,59.27-11.55,23.04-29.94,56.38-33.81,81.94-2.98,14.57-1.46,25.54.25,39.59,1.86,10.21-2.05,21.92,1.12,31.59,2.26,6.9-1.71,12.1-1.27,17.24.55,6.44,2.53,9.86.43,17.34-1.27,4.5,4.04,11.94,1.8,18.18-1.14,3.18,1.36,8.89,3.13,11.19,5.12,10.32,7.56,20.59,8.32,31.99.32,8.04,5.76,27.29-4.09,29.46-8.69,1.92-5.38-7.58-25.99-19.29-4.39-2.49-7.27-9.19-7.57-14.04-.54-8.65-5.03-14.41-7.89-21.74-2.21-5.69-2.42-11.47-5.12-17.28-4.27-9-11.46-21.46-8.76-31.83-2.46-30.56-2.04-95.57-.24-126.09-1.15-5.59,1.42-10.31,3.21-15.18,1.14-17.61,1.4-35.86,5.24-53.38,5.39-12.27,1.06-26.48,4.63-39.6,2.6-26.34,3.22-59,8.38-84.9,5.89-29.8,14.41-43.08,22.18-74.53,3.52-10.58,3.67-25.61,8.1-35.97,3.26-5.94,3.24-12.48,4.64-18.77,2.16-9.7,4.97-15.07,7.37-27.88,1.81-9.68,8.53-26,6.53-32.66-2.11-7.03,3.03-11.94,3.14-17.98.56-8.56-.19-91.2,5.02-98.02,9.56-41.98,15.78-27.81,28.23-48.65,3.6-6.02,78.5-29.24,77.15-28.48,0,0,19.17-10.88,19.17-10.88,38.6-18.8,66.8-19.24,63.56-67.06.16-10.56-.98-18.43-6.36-27.12-4.34-7-4.45-24.75-7.54-25.62-7.37-2.06-9.78-7.21-13.62-12.77-10.61-15.35-5.96-20.75,1.14-35.97-3.09-5.2-6.08-13.12-1.33-17.82,2.14-2.12,8.45-.9,8.7-5.29,1.72-30.64-5.86-48.03,16.73-69.44,42.67-51.09,125.98-31.15,138.62,33.58,0,0,.37,34.33.37,34.33.08,7.44,8.79,4.29,11.65,7.33,3.91,4.15-1.78,17.17-.41,21.44,6.19,15.5,6.14,22.96-3.63,36.45-6.84,11.43-19.43,4.21-18.78,15.44.46,7.88-4.04,14.28-4.94,21.54-1.65,13.32-.48,26.79-.37,40.18,7.63,35.75,68.49,49.08,95.78,64.81,13.15,6.1,37.17,13.28,49.78,19.8,59.84,27.88,47.22,99.53,48.68,152.88.03,3.6,4.37,6.68,3.69,10.68-1.88,18.36,2.87,36.47,6.13,54.33,3.13,16.35,7.32,34.65,12.8,50.21,8.76,24.55,5.85,32.01,20.94,62.37,5.17,10.4,4.45,22.66,7.26,33.62,3.97,19.58,3.47,38.76,4.52,58.66.01,12.93,5.01,34.19,3.22,47.11-1.43,6.25,3.11,10.73,3.22,16.23-.59,12.13,2.01,57.85,2.47,69.82,2.47,32.85,2.72,65.68,1.33,98.85-.33,6.57-5.45,12.16-3.23,19.73,2.91,9.88-9.94,40.92-9.9,40.71l-3.73,20.52c-1.61.4-30.51,65.42-41.14,31.5-1.77-4.67.47-11.52,3.64-15.59,5.47-10.34,20.47-21.83,10.86-33.77l.93-9.02c-12.68-12.21,6.88-24.42-1.88-22.95-6.65,1.11-6.39,8.29-17.93,12.1-16.33,5.43-13.86-17.21-9.41-22.96,9.84-11.65,16.03-26.95,15.07-42.48-2.4-15.02,11.23-9.97,11.2-27.53,1.99-18.55-4.58-35.43-8.79-52.84-.37-6.47-1.98-10.78-4.18-16.44-7.95-21.49-17.95-44.99-27.97-65.46-15.39-31.67-34.72-101.22-31.37-130.05-5.39-22.4-13.79-51.65-26.51-71.24-2.06-3.51-7.17-20.44-11.68-19.9-.7.08-1.69.9-1.84,2.02,0,0-5.24,38.32-5.24,38.32-.48,3.48-3.93,7.3-2.76,11.04,2.07,6.61-2.94,12.2-2.85,17.89.12,7.39-3.15,12.93-3.74,19.48-2.4,24.2.05,53.07,1.5,77.51.57,9.39,1.76,18.21,1.69,27.83-.11,15.54,6.62,29.78,10.31,44.29,3.92,16.97,8.23,32.6,10.49,49.75,0,0,3.69,13.76,3.69,13.76,0,0,1.78,26.91,1.78,26.91,2.63,11.55,6.36,36.4,7.65,48.82.73,5.63,5.06,11.62,2.75,17.98-2.62,7.21,2.92,12.71,3.17,18.88.26,32.56,3.6,65.64-3.48,96.91.56,61.13-16.44,123.45-39.65,180.07-2.58,6.68-2.14,13.68-5.95,20.12-2.23,3.78-.96,9.1-2.7,13.1-2.65,6.1-4.08,12.05-3.21,18.88-.64,24.74-3.02,83.18.31,104.85,12.89,37.55,13.72,79.9,12.45,119.07-.17,14.54-5.99,29.68-6.3,35.29-1.12,15.38-9,28.99-10.55,44.24-3.48,9.83-8.55,28.48-9.59,38.9-2.63,11.45-10.77,51.16-12.97,62.59-.96,5.72-4.81,11.51-2.8,17.89,2.16,6.87-2.5,11.95-3.09,17.93-3.03,30.88,2.26,47.91,1.28,70.15-2.68,61.19,40.81,54.56,37.01,77.81-2.85,17.45-12.37,7.45-40.82,12.67-5.32.98-11.51-1.07-16.43,1.11-15.35,4.15-30.65-4.97-40.19-16.71-3.24-4.04-11.5-6.7-11.49-13.1.03-13.33-1.07-25.67-5.08-38.38-15.71-49.77,12.84-52.23,10.64-99.44-.27-42-7.5-85.94-14.11-126.91-.77-5.05-4.29-10.03-2.77-15.42,1.83-6.5-3.18-11.29-3.23-17.15l-.52-72.42c-.02-3.07,3.89-5.95,3.6-8.76-1.07-10.26,2.83-18.51,4.9-27.98,2.73-12.49,3.62-48.24,1.7-61.02-1.57-10.43-9.1-19.65-9.73-30.27-.43-7.15-7.16-26.1-7.19-27.61Z";
+  svgSilhouetteShape = parseSVGPathToShape(pathD);
+  console.log('SVG silhouette loaded from inline data:', svgSilhouetteShape.length, 'points');
+}
+
+loadSVGSilhouette('assets/silueta-man.svg');
+
+// === SHAPE DEFINITIONS ===
+function resampleByAngle(rawPts, n) {
+  if (rawPts.length < 3) return rawPts;
+
+  let cx = 0, cy = 0;
+  for (const p of rawPts) { cx += p[0]; cy += p[1]; }
+  cx /= rawPts.length; cy /= rawPts.length;
+
+  const closed = rawPts[0][0] === rawPts[rawPts.length-1][0] && rawPts[0][1] === rawPts[rawPts.length-1][1]
+    ? rawPts : [...rawPts, rawPts[0]];
+  const lens = [0];
+  for (let i = 1; i < closed.length; i++) {
+    const dx = closed[i][0] - closed[i-1][0], dy = closed[i][1] - closed[i-1][1];
+    lens.push(lens[i-1] + Math.sqrt(dx*dx + dy*dy));
+  }
+  const totalLen = lens[lens.length - 1];
+
+  function sampleAtArcLen(targetLen) {
+    for (let i = 1; i < lens.length; i++) {
+      if (lens[i] >= targetLen) {
+        const t = (targetLen - lens[i-1]) / (lens[i] - lens[i-1]);
+        return [
+          closed[i-1][0] + t * (closed[i][0] - closed[i-1][0]),
+          closed[i-1][1] + t * (closed[i][1] - closed[i-1][1])
+        ];
+      }
+    }
+    return closed[closed.length - 1].slice();
+  }
+
+  const result = [];
+  for (let i = 0; i <= n; i++) {
+    const targetAngle = (i / n) * Math.PI * 2;
+
+    let bestDist = Infinity, bestPt = null;
+    for (let j = 0; j < 200; j++) {
+      const arcLen = (j / 200) * totalLen;
+      const pt = sampleAtArcLen(arcLen);
+      const angle = Math.atan2(pt[1] - cy, pt[0] - cx);
+      const normAngle = ((angle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+      const diff = Math.abs(normAngle - targetAngle);
+      const angDist = Math.min(diff, Math.PI * 2 - diff);
+      if (angDist < bestDist) {
+        bestDist = angDist;
+        bestPt = pt;
+      }
+    }
+    result.push(bestPt || [Math.cos(targetAngle), Math.sin(targetAngle)]);
+  }
+  return result;
+}
+
+const staticShapeCache = {};
+function generateStaticShape(name, n) {
+  const key = name + '_' + n;
+  if (staticShapeCache[key]) return staticShapeCache[key];
+  let raw = [];
+  if (name === 'circle') {
+    for (let i = 0; i <= n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      raw.push([Math.cos(a), Math.sin(a)]);
+    }
+    staticShapeCache[key] = raw;
+    return raw;
+  } else if (name === 'star') {
+    const spikes = 5;
+    for (let i = 0; i <= spikes * 2; i++) {
+      const a = (i / (spikes * 2)) * Math.PI * 2;
+      const r = i % 2 === 0 ? 1 : 0.4;
+      raw.push([Math.cos(a) * r, Math.sin(a) * r]);
+    }
+  } else if (name === 'heart') {
+    for (let i = 0; i <= 100; i++) {
+      const a = (i / 100) * Math.PI * 2;
+      raw.push([
+        0.65 * (16 * Math.pow(Math.sin(a), 3)) / 16,
+        0.65 * (13*Math.cos(a) - 5*Math.cos(2*a) - 2*Math.cos(3*a) - Math.cos(4*a)) / 16
+      ]);
+    }
+  } else if (name === 'square') {
+    const s = 0.75;
+    const segs = 25;
+    for (let i = 0; i < segs; i++) { const t = i/segs; raw.push([s, -s + 2*s*t]); }
+    for (let i = 0; i < segs; i++) { const t = i/segs; raw.push([s - 2*s*t, s]); }
+    for (let i = 0; i < segs; i++) { const t = i/segs; raw.push([-s, s - 2*s*t]); }
+    for (let i = 0; i < segs; i++) { const t = i/segs; raw.push([-s + 2*s*t, -s]); }
+  } else if (name === 'triangle') {
+    const s = 0.9;
+    const v = [[s, 0], [s*Math.cos(2*Math.PI/3), s*Math.sin(2*Math.PI/3)], [s*Math.cos(4*Math.PI/3), s*Math.sin(4*Math.PI/3)]];
+    const segs = 33;
+    for (let e = 0; e < 3; e++) {
+      const a = v[e], b = v[(e+1)%3];
+      for (let i = 0; i < segs; i++) { const t = i/segs; raw.push([a[0]+t*(b[0]-a[0]), a[1]+t*(b[1]-a[1])]); }
+    }
+  }
+  const result = resampleByAngle(raw, n);
+  staticShapeCache[key] = result;
+  return result;
+}
+
+// === HUMAN BODY PARAMETRIC MORPH ===
+const bodyKeyframes = [
+  { t: 0.00, rx: 0.00, rz: 0.00, pinch: 0 },
+  { t: 0.04, rx: 0.20, rz: 0.20, pinch: 0 },
+  { t: 0.10, rx: 0.30, rz: 0.28, pinch: 0 },
+  { t: 0.16, rx: 0.26, rz: 0.24, pinch: 0 },
+  { t: 0.20, rx: 0.12, rz: 0.11, pinch: 0 },
+  { t: 0.26, rx: 0.65, rz: 0.22, pinch: 0 },
+  { t: 0.34, rx: 0.52, rz: 0.22, pinch: 0 },
+  { t: 0.42, rx: 0.45, rz: 0.18, pinch: 0 },
+  { t: 0.48, rx: 0.37, rz: 0.16, pinch: 0 },
+  { t: 0.54, rx: 0.42, rz: 0.22, pinch: 0 },
+  { t: 0.62, rx: 0.38, rz: 0.18, pinch: 0.35 },
+  { t: 0.70, rx: 0.32, rz: 0.14, pinch: 0.55 },
+  { t: 0.78, rx: 0.26, rz: 0.12, pinch: 0.65 },
+  { t: 0.86, rx: 0.22, rz: 0.10, pinch: 0.70 },
+  { t: 0.93, rx: 0.18, rz: 0.06, pinch: 0.75 },
+  { t: 0.97, rx: 0.10, rz: 0.04, pinch: 0.50 },
+  { t: 1.00, rx: 0.00, rz: 0.00, pinch: 0 },
+];
+
+function lerpBodyParams(bodyT) {
+  if (bodyT <= 0) return { rx: 0, rz: 0, pinch: 0 };
+  if (bodyT >= 1) return { rx: 0, rz: 0, pinch: 0 };
+  let a = bodyKeyframes[0], b = bodyKeyframes[1];
+  for (let i = 0; i < bodyKeyframes.length - 1; i++) {
+    if (bodyT >= bodyKeyframes[i].t && bodyT <= bodyKeyframes[i + 1].t) {
+      a = bodyKeyframes[i]; b = bodyKeyframes[i + 1]; break;
+    }
+  }
+  const s = (bodyT - a.t) / (b.t - a.t);
+  const ss = s * s * (3 - 2 * s);
+  return {
+    rx: a.rx + (b.rx - a.rx) * ss,
+    rz: a.rz + (b.rz - a.rz) * ss,
+    pinch: a.pinch + (b.pinch - a.pinch) * ss,
+  };
+}
+
+function getBodySlice(bodyT, n) {
+  const p = lerpBodyParams(bodyT);
+  const pts = [];
+  for (let i = 0; i <= n; i++) {
+    const a = (i / n) * Math.PI * 2;
+    const mod = 1 + p.pinch * Math.cos(2 * a);
+    const r = Math.max(0.001, mod);
+    pts.push([p.rx * r * Math.cos(a), p.rz * r * Math.sin(a)]);
+  }
+  return pts;
+}
+
+function blendShapes(shapeA, shapeB, blend) {
+  if (blend <= 0) return shapeA;
+  if (blend >= 1) return shapeB;
+  const lenA = shapeA.length, lenB = shapeB.length;
+  const outLen = Math.max(lenA, lenB);
+  const result = [];
+  for (let i = 0; i < outLen; i++) {
+    const ia = Math.min(Math.round(i * (lenA - 1) / (outLen - 1)), lenA - 1);
+    const ib = Math.min(Math.round(i * (lenB - 1) / (outLen - 1)), lenB - 1);
+    const a = shapeA[ia];
+    const b = shapeB[ib];
+    result.push([
+      a[0] + (b[0] - a[0]) * blend,
+      a[1] + (b[1] - a[1]) * blend,
+    ]);
+  }
+  if (result.length > 1) result.push(result[0].slice());
+  return result;
+}
+
+function resolveShape(name, t, n) {
+  if (name === 'human') return getBodySlice(t, n);
+  if (name === 'svgSilhouette' && svgSilhouetteShape) return svgSilhouetteShape;
+  return generateStaticShape(name, n);
+}
+
+function getRingShape(t, n, shape) {
+  let baseShape = resolveShape(shape.ringShape, t, n);
+
+  if (shape.shapeTransition.active && shape.shapeTransition.blend > 0) {
+    const fromPts = resolveShape(shape.shapeTransition.fromShape, t, n);
+    const toPts = resolveShape(shape.shapeTransition.toShape, t, n);
+    baseShape = blendShapes(fromPts, toPts, shape.shapeTransition.blend);
+  }
+
+  if (shape.shapeMorphBlend > 0 && svgSilhouetteShape && shape.ringShape !== 'svgSilhouette') {
+    baseShape = blendShapes(baseShape, svgSilhouetteShape, shape.shapeMorphBlend);
+  }
+
+  if (shape.shapeRotation !== 0) {
+    const cos = Math.cos(shape.shapeRotation);
+    const sin = Math.sin(shape.shapeRotation);
+    return baseShape.map(p => [
+      p[0] * cos - p[1] * sin,
+      p[0] * sin + p[1] * cos
+    ]);
+  }
+  return baseShape;
+}
+
+// === WORMHOLE GEOMETRY (parameterized) ===
+function funnelR(v, s) { return s.throatRadius * Math.cosh(v * s.throatScale); }
+function funnelZ(v, s) { return s.throatRadius * Math.sinh(v * s.throatScale) / s.throatScale; }
+
+function profileAt(t, s) {
+  const disc = 0.15;
+  const topR = funnelR(s.funnelExtent, s);
+  const topZ = funnelZ(s.funnelExtent, s);
+  let r, z;
+  if (t <= disc) {
+    const ss = t / disc;
+    r = s.discWidth + (topR - s.discWidth) * ss; z = topZ;
+  } else if (t <= 0.5) {
+    const ss = (t - disc) / (0.5 - disc);
+    const v = s.funnelExtent * (1 - ss);
+    r = funnelR(v, s); z = funnelZ(v, s);
+  } else if (t <= 1 - disc) {
+    const ss = (t - 0.5) / (0.5 - disc);
+    const v = s.funnelExtent * ss;
+    r = funnelR(v, s); z = -funnelZ(v, s);
+  } else {
+    const ss = (t - (1 - disc)) / disc;
+    r = topR + (s.discWidth - topR) * ss; z = -topZ;
+  }
+  return { r, z };
+}
+
+// === LINE GEOMETRY BUILDER ===
+const MAX_SEGMENTS = 30000;
+const lineData = new Float32Array(MAX_SEGMENTS * 6 * 8);
+let lineVertCount = 0;
+
+function pushSegment(ax, ay, az, bx, by, bz, alpha) {
+  if (lineVertCount + 6 > MAX_SEGMENTS * 6) return;
+  const o = lineVertCount * 8;
+  const sides = [-1, 1, -2, 1, -2, 2];
+  for (let i = 0; i < 6; i++) {
+    const idx = o + i * 8;
+    lineData[idx]   = ax; lineData[idx+1] = ay; lineData[idx+2] = az;
+    lineData[idx+3] = bx; lineData[idx+4] = by; lineData[idx+5] = bz;
+    lineData[idx+6] = sides[i];
+    lineData[idx+7] = alpha;
+  }
+  lineVertCount += 6;
+}
+
+function buildGeometryForShape(shape) {
+  lineVertCount = 0;
+  const N = shape.meridians;
+  const segCount = 80;
+  const isStaticShape = (shape.ringShape !== 'human');
+
+  // Meridian lines
+  for (let j = 0; j < N; j++) {
+    const theta = (j / N) * Math.PI * 2;
+    const ct = Math.cos(theta), st = Math.sin(theta);
+    for (let i = 0; i < segCount; i++) {
+      const t0 = i / segCount, t1 = (i + 1) / segCount;
+      const p0 = profileAt(t0, shape), p1 = profileAt(t1, shape);
+
+      let x0, y0, z0, x1, y1, z1;
+      if (isStaticShape && shape.ringShape !== 'svgSilhouette') {
+        x0 = p0.r * ct; y0 = p0.z; z0 = p0.r * st;
+        x1 = p1.r * ct; y1 = p1.z; z1 = p1.r * st;
+      } else if (shape.ringShape === 'svgSilhouette' && svgSilhouetteShape) {
+        const si = Math.floor((j / N) * (svgSilhouetteShape.length - 1));
+        const sp = svgSilhouetteShape[si];
+        x0 = p0.r * sp[0]; y0 = p0.z; z0 = p0.r * sp[1];
+        x1 = p1.r * sp[0]; y1 = p1.z; z1 = p1.r * sp[1];
+      } else if (shape.ringShape === 'human') {
+        const slice0 = getBodySlice(t0, N);
+        const slice1 = getBodySlice(t1, N);
+        const idx = Math.min(j, slice0.length - 1);
+        const s0 = slice0[idx], s1 = slice1[idx];
+        x0 = p0.r * s0[0]; y0 = p0.z; z0 = p0.r * s0[1];
+        x1 = p1.r * s1[0]; y1 = p1.z; z1 = p1.r * s1[1];
+      } else {
+        x0 = p0.r * ct; y0 = p0.z; z0 = p0.r * st;
+        x1 = p1.r * ct; y1 = p1.z; z1 = p1.r * st;
+      }
+
+      pushSegment(x0, y0, z0, x1, y1, z1, shape.meridianAlpha);
+    }
+  }
+
+  // Flowing rings
+  const spacing = 1 / shape.ringCount;
+  for (let i = 0; i < shape.ringCount; i++) {
+    let t = ((i * spacing + shape.flowOffset) % 1 + 1) % 1;
+    const edgeFade = Math.min(t, 1 - t) / 0.08;
+    const alpha = Math.min(edgeFade, 1) * shape.ringAlpha;
+    if (alpha <= 0) continue;
+
+    const prof = profileAt(t, shape);
+    const shapePts = getRingShape(t, N, shape);
+    const numPts = shapePts.length;
+
+    for (let j = 0; j < numPts - 1; j++) {
+      const p0 = shapePts[j];
+      const p1 = shapePts[(j + 1) % numPts];
+      pushSegment(
+        prof.r * p0[0], prof.z, prof.r * p0[1],
+        prof.r * p1[0], prof.z, prof.r * p1[1],
+        alpha
+      );
+    }
+  }
+}
+
+// Line buffer
+const lineBuf = gl.createBuffer();
+const lineVAO = gl.createVertexArray();
+gl.bindVertexArray(lineVAO);
+gl.bindBuffer(gl.ARRAY_BUFFER, lineBuf);
+gl.bufferData(gl.ARRAY_BUFFER, lineData.byteLength, gl.DYNAMIC_DRAW);
+gl.enableVertexAttribArray(0);
+gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 32, 0);
+gl.enableVertexAttribArray(1);
+gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 32, 12);
+gl.enableVertexAttribArray(2);
+gl.vertexAttribPointer(2, 1, gl.FLOAT, false, 32, 24);
+gl.enableVertexAttribArray(3);
+gl.vertexAttribPointer(3, 1, gl.FLOAT, false, 32, 28);
+gl.bindVertexArray(null);
+
+// === MATRIX MATH ===
+function mat4Perspective(fov, aspect, near, far) {
+  const f = 1 / Math.tan(fov / 2);
+  return new Float32Array([
+    f/aspect, 0, 0, 0,
+    0, f, 0, 0,
+    0, 0, (far+near)/(near-far), -1,
+    0, 0, 2*far*near/(near-far), 0
+  ]);
+}
+function mat4RotX(a) {
+  const c = Math.cos(a), s = Math.sin(a);
+  return new Float32Array([1,0,0,0, 0,c,s,0, 0,-s,c,0, 0,0,0,1]);
+}
+function mat4RotY(a) {
+  const c = Math.cos(a), s = Math.sin(a);
+  return new Float32Array([c,0,-s,0, 0,1,0,0, s,0,c,0, 0,0,0,1]);
+}
+function mat4Translate(x, y, z) {
+  return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, x,y,z,1]);
+}
+function mat4Mul(a, b) {
+  const r = new Float32Array(16);
+  for (let i = 0; i < 4; i++)
+    for (let j = 0; j < 4; j++) {
+      let s = 0;
+      for (let k = 0; k < 4; k++) s += a[i + k*4] * b[k + j*4];
+      r[i + j*4] = s;
+    }
+  return r;
+}
+function mat4MulVec4(m, v) {
+  const r = [0,0,0,0];
+  for (let i = 0; i < 4; i++) {
+    r[i] = m[i]*v[0] + m[i+4]*v[1] + m[i+8]*v[2] + m[i+12]*v[3];
+  }
+  return r;
+}
+
+// === INTERACTION ===
+let isDragging = false, lastMX = 0, lastMY = 0;
+
+canvas.addEventListener('mousedown', e => {
+  if (posterEditMode) return;
+  isDragging = true;
+  lastMX = e.clientX;
+  lastMY = e.clientY;
+});
+window.addEventListener('mousemove', e => {
+  if (!isDragging) return;
+  const dx = e.clientX - lastMX, dy = e.clientY - lastMY;
+  if (e.shiftKey) {
+    // Shift+drag = pan camera (global)
+    G.panX += dx * 0.005;
+    G.panY -= dy * 0.005;
+  } else if (e.altKey) {
+    // Alt+drag = rotate selected shape
+    const s = sel();
+    s.targetRotY += dx * 0.005;
+    s.targetRotX += dy * 0.005;
+    s.rotX = s.targetRotX;
+    s.rotY = s.targetRotY;
+  } else {
+    // Normal drag = move selected shape in world XY
+    const s = sel();
+    const worldPerPx = Math.abs(G.cameraZ) * 0.001;
+    s.x += dx * worldPerPx;
+    s.y -= dy * worldPerPx;
+  }
+  lastMX = e.clientX; lastMY = e.clientY;
+});
+window.addEventListener('mouseup', () => {
+  isDragging = false;
+});
+
+// Touch
+canvas.addEventListener('touchstart', e => {
+  if (posterEditMode) return;
+  isDragging = true;
+  lastMX = e.touches[0].clientX;
+  lastMY = e.touches[0].clientY;
+}, { passive: true });
+window.addEventListener('touchmove', e => {
+  if (!isDragging) return;
+  const dx = e.touches[0].clientX - lastMX;
+  const dy = e.touches[0].clientY - lastMY;
+  // Touch defaults to rotate
+  const s = sel();
+  s.targetRotY += dx * 0.005;
+  s.targetRotX += dy * 0.005;
+  s.rotX = s.targetRotX;
+  s.rotY = s.targetRotY;
+  lastMX = e.touches[0].clientX; lastMY = e.touches[0].clientY;
+}, { passive: true });
+window.addEventListener('touchend', () => {
+  isDragging = false;
+});
+
+// === DRAW FULLSCREEN QUAD ===
+function drawQuad() {
+  gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+}
+
+// === RENDER (GSAP ticker) ===
+let lastTime = 0;
+
+// On mobile, use coarser grain to avoid sub-pixel moire
+const isMobile = window.innerWidth < window.innerHeight || 'ontouchstart' in window;
+
+function render(time, dt) {
+  const deltaTime = dt * 0.001;
+  G.time += deltaTime;
+
+  // Update per-shape flow offsets
+  for (const shape of shapes) {
+    shape.flowOffset = G.time * shape.flowSpeed * shape.flowDir;
+  }
+
+  const w = canvas.width, h = canvas.height;
+  const aspect = w / h;
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+
+  // Global view+proj
+  const proj = mat4Perspective(0.8, aspect, 0.1, 100);
+  const refAspect = 16 / 9;
+  const aspectScale = aspect / refAspect;
+  let viewPanX = G.panX * aspectScale;
+  let viewPanY = G.panY * aspectScale;
+  if (aspect < 1) {
+    const fov = 0.8;
+    const gapNDC = -(posterGapCenter * 2 - 1);
+    const visibleH = 2 * Math.abs(G.cameraZ) * Math.tan(fov / 2);
+    viewPanX = 0;
+    viewPanY = gapNDC * visibleH * 0.5;
+  }
+  const view = mat4Translate(viewPanX, viewPanY, G.cameraZ);
+
+  // === Pass 1: Render all shapes to scene FBO ===
+  gl.bindFramebuffer(gl.FRAMEBUFFER, sceneFBO.fbo);
+  gl.viewport(0, 0, sceneFBO.w, sceneFBO.h);
+  gl.clearColor(0, 0, 0, 0);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.enable(gl.BLEND);
+  if (G.flatMode) {
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+  } else {
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+  }
+
+  gl.useProgram(lineProg);
+  gl.uniform2f(lineU.u_resolution, w, h);
+  gl.uniform3fv(lineU.u_color, G.lineColor);
+
+  for (const shape of shapes) {
+    // Per-shape model matrix
+    const sc = Math.max(shape.scale * G.masterScale * (aspect < 1 ? 0.5 : 1), 0.001);
+    const scaleM = new Float32Array([sc,0,0,0, 0,sc,0,0, 0,0,sc,0, 0,0,0,1]);
+    const rotXM = mat4RotX(shape.rotX);
+    const rotYM = mat4RotY(shape.rotY);
+    const trans = mat4Translate(shape.x, shape.y, shape.z);
+    const model = mat4Mul(trans, mat4Mul(rotYM, mat4Mul(rotXM, scaleM)));
+    const mvp = mat4Mul(proj, mat4Mul(view, model));
+
+    // Build geometry for this shape
+    buildGeometryForShape(shape);
+    gl.bindBuffer(gl.ARRAY_BUFFER, lineBuf);
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, lineData, 0, lineVertCount * 8);
+
+    // Set per-shape uniforms
+    gl.uniformMatrix4fv(lineU.u_mvp, false, mvp);
+    gl.uniform1f(lineU.u_thickness, shape.ringWidth);
+    gl.uniform1f(lineU.u_glowIntensity, shape.glowIntensity);
+    gl.uniform1f(lineU.u_glowFalloff, shape.glowFalloff);
+
+    gl.bindVertexArray(lineVAO);
+    gl.drawArrays(gl.TRIANGLES, 0, lineVertCount);
+    gl.bindVertexArray(null);
+  }
+
+  // === Pass 2: Bloom (blur the scene) ===
+  gl.useProgram(blurProg);
+  gl.uniform1i(blurU.u_tex, 0);
+
+  gl.bindFramebuffer(gl.FRAMEBUFFER, bloomFBO1.fbo);
+  gl.viewport(0, 0, bloomFBO1.w, bloomFBO1.h);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, sceneFBO.tex);
+  gl.uniform2f(blurU.u_dir, 1.0 / bloomFBO1.w, 0);
+  drawQuad();
+
+  gl.bindFramebuffer(gl.FRAMEBUFFER, bloomFBO2.fbo);
+  gl.viewport(0, 0, bloomFBO2.w, bloomFBO2.h);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.bindTexture(gl.TEXTURE_2D, bloomFBO1.tex);
+  gl.uniform2f(blurU.u_dir, 0, 1.0 / bloomFBO2.h);
+  drawQuad();
+
+  gl.bindFramebuffer(gl.FRAMEBUFFER, bloomFBO1.fbo);
+  gl.viewport(0, 0, bloomFBO1.w, bloomFBO1.h);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.bindTexture(gl.TEXTURE_2D, bloomFBO2.tex);
+  gl.uniform2f(blurU.u_dir, 2.0 / bloomFBO1.w, 0);
+  drawQuad();
+
+  gl.bindFramebuffer(gl.FRAMEBUFFER, bloomFBO2.fbo);
+  gl.viewport(0, 0, bloomFBO2.w, bloomFBO2.h);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.bindTexture(gl.TEXTURE_2D, bloomFBO1.tex);
+  gl.uniform2f(blurU.u_dir, 0, 2.0 / bloomFBO2.h);
+  drawQuad();
+
+  // === Pass 3: Composite ===
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.viewport(0, 0, w, h);
+  gl.clearColor(...G.bgColor, 1);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.disable(gl.BLEND);
+
+  gl.useProgram(compositeProg);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, sceneFBO.tex);
+  gl.uniform1i(compU.u_scene, 0);
+  gl.activeTexture(gl.TEXTURE1);
+  gl.bindTexture(gl.TEXTURE_2D, bloomFBO2.tex);
+  gl.uniform1i(compU.u_bloom, 1);
+  gl.uniform1f(compU.u_bloomIntensity, G.bloomIntensity);
+  gl.uniform1f(compU.u_chromaticAberration, G.chromaticAberration);
+  gl.uniform1f(compU.u_vignette, G.vignette);
+  gl.uniform1f(compU.u_grain, isMobile ? G.grain * 0.8 : G.grain);
+  gl.uniform1f(compU.u_grainScale, isMobile ? 1.1 : 1.0);
+  gl.uniform1f(compU.u_time, G.time % 1000);
+  gl.uniform3fv(compU.u_bgColor, G.bgColor);
+  gl.uniform1f(compU.u_masterOpacity, G.masterOpacity);
+  gl.uniform1f(compU.u_flatMode, G.flatMode ? 1.0 : 0.0);
+  gl.uniform3fv(compU.u_lineColor, G.lineColor);
+  gl.uniform3fv(compU.u_posterColor, G.posterColor);
+  gl.uniform3fv(compU.u_posterColor2, G.posterColor2);
+  gl.uniform1f(compU.u_posterReady, posterReady ? 1.0 : 0.0);
+  gl.uniform1f(compU.u_posterThreshold, G.posterThreshold / 255.0);
+  gl.uniform1f(compU.u_posterReveal, G.posterReveal);
+  gl.uniform1f(compU.u_revealBlurMax, G.revealBlurMax);
+  gl.uniform1f(compU.u_revealThreshStart, G.revealThreshStart);
+  gl.uniform1f(compU.u_exportRangeExpand, isExporting ? 1.0 : 0.0);
+  gl.uniform1f(compU.u_posterAspect, posterAspect);
+  gl.uniform1f(compU.u_screenAspect, canvas.width / canvas.height);
+  if (posterReady) {
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D, posterTex);
+    gl.uniform1i(compU.u_poster, 2);
+  }
+  gl.uniform1f(compU.u_videoReady, videoReady ? 1.0 : 0.0);
+  gl.uniform1f(compU.u_videoAspect, videoAspect);
+  {
+    const aspect = canvas.width / canvas.height;
+    const pb = Math.max(0, Math.min(1, (1.4 - aspect) / (1.4 - 0.7)));
+    const vs = (G.videoScalePort != null) ? G.videoScale + (G.videoScalePort - G.videoScale) * pb : G.videoScale;
+    gl.uniform1f(compU.u_videoScale, vs);
+  }
+  if (videoReady) {
+    gl.activeTexture(gl.TEXTURE3);
+    gl.bindTexture(gl.TEXTURE_2D, videoTex);
+    if (!overlayVideo.paused && overlayVideo.readyState >= 2) {
+      try {
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, overlayVideo);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+      } catch(e) { videoReady = false; }
+    }
+    gl.uniform1i(compU.u_video, 3);
+  }
+  // Video 2
+  gl.uniform1f(compU.u_video2Ready, (video2Ready && G.video2Enabled) ? 1.0 : 0.0);
+  gl.uniform1f(compU.u_video2Aspect, video2Aspect);
+  if (video2Ready) {
+    gl.activeTexture(gl.TEXTURE4);
+    gl.bindTexture(gl.TEXTURE_2D, video2Tex);
+    if (!overlayVideo2.paused && overlayVideo2.readyState >= 2) {
+      try {
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, overlayVideo2);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+      } catch(e) { video2Ready = false; }
+    }
+    gl.uniform1i(compU.u_video2, 4);
+  }
+  drawQuad();
+}
+
+// Use GSAP ticker instead of requestAnimationFrame
+gsap.ticker.add(render);
+gsap.ticker.fps(60);
+
+// === BREATHING ANIMATION ===
+let breathingTL = null;
+let breathingEnabled = false;
+
+function createBreathingTimeline() {
+  if (breathingTL) breathingTL.kill();
+  const s = sel();
+  breathingTL = gsap.timeline({ repeat: -1, yoyo: true, paused: true });
+  breathingTL.to(s, {
+    throatRadius: s.throatRadius * 1.05,
+    glowIntensity: s.glowIntensity * 1.05,
+    duration: 2,
+    ease: 'sine.inOut',
+  });
+  breathingTL.to(s, {
+    throatRadius: s.throatRadius * 0.95,
+    glowIntensity: s.glowIntensity * 0.95,
+    duration: 2,
+    ease: 'sine.inOut',
+  });
+}
+createBreathingTimeline();
+
+document.getElementById('flatMode').addEventListener('change', (e) => {
+  G.flatMode = e.target.checked;
+});
+
+document.getElementById('breathingToggle').addEventListener('change', (e) => {
+  breathingEnabled = e.target.checked;
+  if (breathingEnabled) {
+    createBreathingTimeline();
+    breathingTL.play();
+  } else {
+    if (breathingTL) breathingTL.pause();
+  }
+});
+
+// === SCROLL ZOOM ===
+let targetZoom = 20;
+G.cameraZ = -20;
+const ZOOM_MIN = 1.5;
+const ZOOM_MAX = 20;
+
+canvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  targetZoom += e.deltaY * 0.005;
+  targetZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, targetZoom));
+  gsap.to(G, { cameraZ: -targetZoom, duration: 0.4, ease: 'power2.out', overwrite: 'auto' });
+}, { passive: false });
+
+// Touch pinch zoom
+let lastPinchDist = 0;
+canvas.addEventListener('touchstart', (e) => {
+  if (e.touches.length === 2) {
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    lastPinchDist = Math.sqrt(dx*dx + dy*dy);
+  }
+}, { passive: true });
+canvas.addEventListener('touchmove', (e) => {
+  if (e.touches.length === 2) {
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    const delta = lastPinchDist - dist;
+    targetZoom += delta * 0.02;
+    targetZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, targetZoom));
+    gsap.to(G, { cameraZ: -targetZoom, duration: 0.3, ease: 'power2.out', overwrite: true });
+    lastPinchDist = dist;
+  }
+}, { passive: true });
+
+// === PAGE LOAD SEQUENCE ===
+gsap.to(G, {
+  masterScale: 1,
+  masterOpacity: 1,
+  duration: 2,
+  ease: 'power2.out',
+  delay: 0.3,
+  onComplete: () => { introComplete = true; },
+});
+
+// === EXPORT ===
+
+document.getElementById('exportDuration').addEventListener('input', (e) => {
+  document.getElementById('exportDurationVal').textContent = e.target.value;
+});
+
+// === EXPORT HELPERS ===
+function getExportDimensions() {
+  const ratioStr = document.getElementById('exportRatio').value;
+  const quality = parseInt(document.getElementById('exportQuality').value);
+
+  if (ratioStr === 'free') {
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    return { w: Math.round(window.innerWidth * dpr), h: Math.round(window.innerHeight * dpr) };
+  }
+
+  const [rw, rh] = ratioStr.split(':').map(Number);
+  // The "quality" value is the width
+  let w = quality;
+  let h = Math.round(quality * rh / rw);
+  // Ensure even dimensions (required by H.264)
+  w = w + (w % 2); h = h + (h % 2);
+  return { w, h };
+}
+
+function renderOneFrame(dims, frameTime) {
+  const origW = canvas.width, origH = canvas.height;
+  canvas.width = dims.w;
+  canvas.height = dims.h;
+  setupFBOs();
+
+  const savedTime = G.time;
+  G.time = frameTime;
+  for (const shape of shapes) {
+    shape.flowOffset = G.time * shape.flowSpeed * shape.flowDir;
+  }
+  render(0, 0);
+
+  // Read pixels
+  const pixels = new Uint8Array(dims.w * dims.h * 4);
+  gl.readPixels(0, 0, dims.w, dims.h, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+
+  // Restore
+  canvas.width = origW;
+  canvas.height = origH;
+  setupFBOs();
+  G.time = savedTime;
+
+  return pixels;
+}
+
+// Flip rows (WebGL is bottom-up)
+function flipPixels(pixels, w, h) {
+  const row = w * 4;
+  const tmp = new Uint8Array(row);
+  for (let y = 0; y < (h >> 1); y++) {
+    const top = y * row, bot = (h - 1 - y) * row;
+    tmp.set(pixels.subarray(top, top + row));
+    pixels.copyWithin(top, bot, bot + row);
+    pixels.set(tmp, bot);
+  }
+}
+
+// === STILL EXPORT ===
+document.getElementById('exportFrameBtn').addEventListener('click', () => {
+  if (isExporting) return;
+  isExporting = true;
+  const dims = getExportDimensions();
+  const statusEl = document.getElementById('exportStatus');
+  statusEl.textContent = `Capturing ${dims.w}×${dims.h}...`;
+
+  // Render at export resolution, then use canvas.toBlob for lossless PNG
+  const origW = canvas.width, origH = canvas.height;
+  canvas.width = dims.w;
+  canvas.height = dims.h;
+  setupFBOs();
+  renderPosterTexture(false); // Re-render poster at export resolution
+
+  const savedGrain = G.grain;
+  G.grain = 0;
+  G.masterScale = 1;
+  G.masterOpacity = 1;
+  render(0, 0);
+
+  canvas.toBlob(blob => {
+    G.grain = savedGrain;
+    isExporting = false;
+    canvas.width = origW;
+    canvas.height = origH;
+    setupFBOs();
+    renderPosterTexture(false); // Restore poster at screen resolution
+
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    const ratio = document.getElementById('exportRatio').value.replace(':', 'x');
+    a.download = `shapes-${ratio}-${dims.w}x${dims.h}.png`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    statusEl.textContent = `Saved ${dims.w}×${dims.h} PNG (${(blob.size / 1048576).toFixed(1)} MB)`;
+  }, 'image/png');
+});
+
+// === VIDEO EXPORT ===
+document.getElementById('exportVideoBtn').addEventListener('click', async () => {
+  if (isExporting) return;
+  isExporting = true;
+
+  const statusEl = document.getElementById('exportStatus');
+  const progressEl = document.getElementById('exportProgress');
+  const progressBar = document.getElementById('exportProgressBar');
+  const btn = document.getElementById('exportVideoBtn');
+  const format = document.getElementById('exportFormat').value;
+
+  btn.textContent = 'Exporting...';
+  btn.style.color = '#ff3333';
+  progressEl.style.display = 'block';
+  progressBar.style.width = '0%';
+
+  const dims = getExportDimensions();
+  const duration = parseInt(document.getElementById('exportDuration').value);
+  const fps = parseInt(document.getElementById('exportFps').value);
+  const totalFrames = duration * fps;
+  const fixedDt = 1 / fps;
+
+  const origW = canvas.width, origH = canvas.height;
+
+  // Set export resolution
+  canvas.width = dims.w;
+  canvas.height = dims.h;
+  setupFBOs();
+  renderPosterTexture(false); // Re-render poster at export resolution
+  const savedGrain = G.grain;
+  G.grain = 0;
+  G.masterScale = 1;
+  G.masterOpacity = 1;
+
+  // Detach live render loop
+  gsap.ticker.remove(render);
+
+  // Reset time and reveal to simulate page load
+  const savedTime = G.time;
+  const savedReveal = G.posterReveal;
+  const savedMasterScale = G.masterScale;
+  const savedMasterOpacity = G.masterOpacity;
+  G.time = 0;
+  G.posterReveal = 0;
+  G.masterScale = 0;
+  G.masterOpacity = 0;
+  const startTime = 0;
+  // Intro animation params (matches page load sequence)
+  const introDelay = 0.3;
+  const introDuration = 2;
+
+  // Seek overlay video to beginning
+  const videoStartTime = 0;
+  if (videoReady && overlayVideo.readyState >= 2) {
+    overlayVideo.currentTime = 0;
+    await new Promise(r => {
+      const done = () => { overlayVideo.removeEventListener('seeked', done); r(); };
+      overlayVideo.addEventListener('seeked', done);
+    });
+  }
+  const videoDuration = overlayVideo.duration || 10;
+  const video2Duration = overlayVideo2.duration || 10;
+  async function seekVideo(frameTime) {
+    const promises = [];
+    if (videoReady && overlayVideo.readyState >= 2) {
+      const t = (videoStartTime + frameTime) % videoDuration;
+      overlayVideo.currentTime = t;
+      promises.push(new Promise(r => {
+        const done = () => { overlayVideo.removeEventListener('seeked', done); r(); };
+        overlayVideo.addEventListener('seeked', done);
+      }));
+    }
+    if (video2Ready && overlayVideo2.readyState >= 2) {
+      const t2 = frameTime % video2Duration;
+      overlayVideo2.currentTime = t2;
+      promises.push(new Promise(r => {
+        const done = () => { overlayVideo2.removeEventListener('seeked', done); r(); };
+        overlayVideo2.addEventListener('seeked', done);
+      }));
+    }
+    await Promise.all(promises);
+  }
+
+  if (format === 'mp4' && typeof VideoEncoder !== 'undefined' && typeof Mp4Muxer !== 'undefined') {
+    // === MP4 via WebCodecs + mp4-muxer ===
+    statusEl.textContent = `Encoding MP4 ${dims.w}×${dims.h} @ ${fps}fps...`;
+
+    const muxer = new Mp4Muxer.Muxer({
+      target: new Mp4Muxer.ArrayBufferTarget(),
+      video: {
+        codec: 'avc',
+        width: dims.w,
+        height: dims.h,
+        color: {
+          fullRange: true,
+          matrixIndex: 1,       // BT.709
+          primariesIndex: 1,    // BT.709
+          transferIndex: 1,     // BT.709
+        },
+      },
+      fastStart: 'in-memory',
+    });
+
+    const encoder = new VideoEncoder({
+      output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+      error: (e) => console.error('VideoEncoder error:', e),
+    });
+
+    // Pick AVC level based on resolution: 4.0 for ≤1080p, 5.1 for ≤4K, 5.2 for above
+    const pixels = dims.w * dims.h;
+    const avcLevel = pixels <= 2097152 ? '28' : pixels <= 8912896 ? '33' : '34';
+    encoder.configure({
+      codec: `avc1.6400${avcLevel}`,
+      width: dims.w,
+      height: dims.h,
+      bitrate: pixels > 4000000 ? 50_000_000 : 30_000_000,
+      framerate: fps,
+      hardwareAcceleration: 'prefer-software',
+    });
+
+    for (let frame = 0; frame < totalFrames; frame++) {
+      const frameTime = frame * fixedDt;
+      await seekVideo(frameTime);
+      G.time = startTime + frameTime;
+      for (const shape of shapes) {
+        shape.flowOffset = G.time * shape.flowSpeed * shape.flowDir;
+      }
+      // Animate reveal during export (power3.out)
+      const revealElapsed = frameTime - G.revealDelay;
+      if (revealElapsed <= 0) {
+        G.posterReveal = 0;
+      } else if (revealElapsed >= G.revealDuration) {
+        G.posterReveal = 1;
+      } else {
+        const rt = revealElapsed / G.revealDuration;
+        G.posterReveal = 1 - Math.pow(1 - rt, 3);
+      }
+      // Animate intro (masterScale/masterOpacity) (power2.out)
+      const introElapsed = frameTime - introDelay;
+      if (introElapsed <= 0) {
+        G.masterScale = 0;
+        G.masterOpacity = 0;
+      } else if (introElapsed >= introDuration) {
+        G.masterScale = 1;
+        G.masterOpacity = 1;
+      } else {
+        const it = introElapsed / introDuration;
+        const eased = 1 - Math.pow(1 - it, 2);
+        G.masterScale = eased;
+        G.masterOpacity = eased;
+      }
+      render(0, fixedDt * 1000);
+
+      const vf = new VideoFrame(canvas, {
+        timestamp: frame * fixedDt * 1_000_000,
+        duration: fixedDt * 1_000_000,
+      });
+
+      const keyFrame = frame % (fps * 2) === 0;
+      encoder.encode(vf, { keyFrame });
+      vf.close();
+
+      // Backpressure: wait if encoder queue is deep
+      while (encoder.encodeQueueSize > 8) {
+        await new Promise(r => setTimeout(r, 1));
+      }
+
+      const pct = Math.round((frame + 1) / totalFrames * 100);
+      progressBar.style.width = pct + '%';
+      statusEl.textContent = `Encoding frame ${frame + 1}/${totalFrames}...`;
+
+      // Yield to keep UI responsive
+      if (frame % 4 === 0) await new Promise(r => setTimeout(r, 0));
+    }
+
+    await encoder.flush();
+    encoder.close();
+    muxer.finalize();
+
+    const mp4Buf = muxer.target.buffer;
+    const mp4Blob = new Blob([mp4Buf], { type: 'video/mp4' });
+
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(mp4Blob);
+    const ratio = document.getElementById('exportRatio').value.replace(':', 'x');
+    a.download = `shapes-${ratio}-${dims.w}x${dims.h}.mp4`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+
+    statusEl.textContent = `Done! MP4 ${dims.w}×${dims.h}, ${totalFrames} frames, ${(mp4Blob.size / 1048576).toFixed(1)} MB`;
+
+  } else if (format === 'png') {
+    // === PNG Sequence (ZIP) ===
+    statusEl.textContent = `Rendering ${totalFrames} PNG frames at ${dims.w}×${dims.h}...`;
+
+    const pngBlobs = [];
+    const tmpCanvas = document.createElement('canvas');
+    tmpCanvas.width = dims.w;
+    tmpCanvas.height = dims.h;
+    const tmpCtx = tmpCanvas.getContext('2d');
+
+    for (let frame = 0; frame < totalFrames; frame++) {
+      const frameTime = frame * fixedDt;
+      await seekVideo(frameTime);
+      G.time = startTime + frameTime;
+      for (const shape of shapes) {
+        shape.flowOffset = G.time * shape.flowSpeed * shape.flowDir;
+      }
+      // Animate reveal during export (power3.out)
+      const revealElapsed = frameTime - G.revealDelay;
+      if (revealElapsed <= 0) {
+        G.posterReveal = 0;
+      } else if (revealElapsed >= G.revealDuration) {
+        G.posterReveal = 1;
+      } else {
+        const rt = revealElapsed / G.revealDuration;
+        G.posterReveal = 1 - Math.pow(1 - rt, 3);
+      }
+      // Animate intro (masterScale/masterOpacity) (power2.out)
+      const introElapsed = frameTime - introDelay;
+      if (introElapsed <= 0) {
+        G.masterScale = 0;
+        G.masterOpacity = 0;
+      } else if (introElapsed >= introDuration) {
+        G.masterScale = 1;
+        G.masterOpacity = 1;
+      } else {
+        const it = introElapsed / introDuration;
+        const eased = 1 - Math.pow(1 - it, 2);
+        G.masterScale = eased;
+        G.masterOpacity = eased;
+      }
+      render(0, fixedDt * 1000);
+
+      tmpCtx.drawImage(canvas, 0, 0);
+      const blob = await new Promise(r => tmpCanvas.toBlob(r, 'image/png'));
+      pngBlobs.push(blob);
+
+      const pct = Math.round((frame + 1) / totalFrames * 100);
+      progressBar.style.width = pct + '%';
+      statusEl.textContent = `Frame ${frame + 1}/${totalFrames}...`;
+
+      if (frame % 4 === 0) await new Promise(r => setTimeout(r, 0));
+    }
+
+    statusEl.textContent = 'Building ZIP...';
+    await new Promise(r => setTimeout(r, 0));
+
+    const zipBlob = await buildZip(pngBlobs, fps);
+
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(zipBlob);
+    const ratio = document.getElementById('exportRatio').value.replace(':', 'x');
+    a.download = `shapes-${ratio}-${dims.w}x${dims.h}-pngs.zip`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+
+    statusEl.textContent = `Done! ${totalFrames} PNGs, ${(zipBlob.size / 1048576).toFixed(1)} MB`;
+
+  } else {
+    // Fallback: WebM via MediaRecorder
+    statusEl.textContent = `Encoding WebM ${dims.w}×${dims.h}...`;
+
+    const stream = canvas.captureStream(0);
+    const chunks = [];
+    const recorder = new MediaRecorder(stream, {
+      mimeType: 'video/webm;codecs=vp9',
+      videoBitsPerSecond: 30_000_000
+    });
+    recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+    const recordingDone = new Promise(resolve => { recorder.onstop = resolve; });
+    recorder.start();
+
+    for (let frame = 0; frame < totalFrames; frame++) {
+      const frameTime = frame * fixedDt;
+      await seekVideo(frameTime);
+      G.time = startTime + frameTime;
+      for (const shape of shapes) {
+        shape.flowOffset = G.time * shape.flowSpeed * shape.flowDir;
+      }
+      // Animate reveal during export (power3.out)
+      const revealElapsed = frameTime - G.revealDelay;
+      if (revealElapsed <= 0) {
+        G.posterReveal = 0;
+      } else if (revealElapsed >= G.revealDuration) {
+        G.posterReveal = 1;
+      } else {
+        const rt = revealElapsed / G.revealDuration;
+        G.posterReveal = 1 - Math.pow(1 - rt, 3);
+      }
+      // Animate intro (masterScale/masterOpacity) (power2.out)
+      const introElapsed = frameTime - introDelay;
+      if (introElapsed <= 0) {
+        G.masterScale = 0;
+        G.masterOpacity = 0;
+      } else if (introElapsed >= introDuration) {
+        G.masterScale = 1;
+        G.masterOpacity = 1;
+      } else {
+        const it = introElapsed / introDuration;
+        const eased = 1 - Math.pow(1 - it, 2);
+        G.masterScale = eased;
+        G.masterOpacity = eased;
+      }
+      render(0, fixedDt * 1000);
+      stream.getVideoTracks()[0].requestFrame();
+
+      const pct = Math.round((frame + 1) / totalFrames * 100);
+      progressBar.style.width = pct + '%';
+      statusEl.textContent = `Frame ${frame + 1}/${totalFrames} (WebM fallback)...`;
+
+      await new Promise(r => setTimeout(r, 1));
+    }
+
+    recorder.stop();
+    await recordingDone;
+
+    const blob = new Blob(chunks, { type: 'video/webm' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    const ratio = document.getElementById('exportRatio').value.replace(':', 'x');
+    a.download = `shapes-${ratio}-${dims.w}x${dims.h}.webm`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+
+    statusEl.textContent = `Done! WebM ${dims.w}×${dims.h}, ${(blob.size / 1048576).toFixed(1)} MB`;
+  }
+
+  // Restore
+  G.grain = savedGrain;
+  // Restore state after export
+  G.time = savedTime;
+  G.posterReveal = savedReveal;
+  G.masterScale = savedMasterScale;
+  G.masterOpacity = savedMasterOpacity;
+  canvas.width = origW;
+  canvas.height = origH;
+  setupFBOs();
+  renderPosterTexture(false); // Restore poster at screen resolution
+  gsap.ticker.add(render);
+
+  progressEl.style.display = 'none';
+  btn.textContent = 'Export Video';
+  btn.style.color = '#ff6666';
+  isExporting = false;
+});
+
+// === MINIMAL ZIP BUILDER ===
+// CRC32 lookup table
+const crc32Table = new Uint32Array(256);
+for (let i = 0; i < 256; i++) {
+  let c = i;
+  for (let j = 0; j < 8; j++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+  crc32Table[i] = c;
+}
+function crc32(data) {
+  let crc = 0xFFFFFFFF;
+  for (let i = 0; i < data.length; i++) crc = crc32Table[(crc ^ data[i]) & 0xFF] ^ (crc >>> 8);
+  return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+
+async function buildZip(blobs, fps) {
+  const files = [];
+  for (let i = 0; i < blobs.length; i++) {
+    const name = `frame-${String(i).padStart(5, '0')}.png`;
+    const data = new Uint8Array(await blobs[i].arrayBuffer());
+    files.push({ name, data });
+  }
+
+  // Add a readme with ffmpeg command
+  const readme = new TextEncoder().encode(
+    `# PNG Sequence\n# ${blobs.length} frames at ${fps}fps\n# Encode with:\nffmpeg -framerate ${fps} -i frame-%05d.png -c:v libx264 -pix_fmt yuv420p -crf 12 -preset slow output.mp4\n`
+  );
+  files.push({ name: 'README.txt', data: readme });
+
+  // Build ZIP (store, no compression — PNGs are already compressed)
+  const parts = [];
+  const centralDir = [];
+  let offset = 0;
+
+  for (const f of files) {
+    const nameBytes = new TextEncoder().encode(f.name);
+    const fileCrc = crc32(f.data);
+    // Local file header
+    const header = new Uint8Array(30 + nameBytes.length);
+    const hv = new DataView(header.buffer);
+    hv.setUint32(0, 0x04034b50, true);  // signature
+    hv.setUint16(4, 20, true);          // version needed
+    hv.setUint16(6, 0, true);           // flags
+    hv.setUint16(8, 0, true);           // compression: store
+    hv.setUint16(10, 0, true);          // mod time
+    hv.setUint16(12, 0, true);          // mod date
+    hv.setUint32(14, fileCrc, true);    // crc32
+    hv.setUint32(18, f.data.length, true); // compressed size
+    hv.setUint32(22, f.data.length, true); // uncompressed size
+    hv.setUint16(26, nameBytes.length, true);
+    hv.setUint16(28, 0, true);          // extra field length
+    header.set(nameBytes, 30);
+
+    // Central directory entry
+    const cdEntry = new Uint8Array(46 + nameBytes.length);
+    const cv = new DataView(cdEntry.buffer);
+    cv.setUint32(0, 0x02014b50, true);
+    cv.setUint16(4, 20, true);
+    cv.setUint16(6, 20, true);
+    cv.setUint16(8, 0, true);
+    cv.setUint16(10, 0, true);
+    cv.setUint16(12, 0, true);
+    cv.setUint16(14, 0, true);
+    cv.setUint32(16, fileCrc, true);    // crc32
+    cv.setUint32(20, f.data.length, true);
+    cv.setUint32(24, f.data.length, true);
+    cv.setUint16(28, nameBytes.length, true);
+    cv.setUint16(30, 0, true);
+    cv.setUint16(32, 0, true);
+    cv.setUint16(34, 0, true);
+    cv.setUint16(36, 0, true);
+    cv.setUint32(38, 0x20, true);       // external attrs
+    cv.setUint32(42, offset, true);     // local header offset
+    cdEntry.set(nameBytes, 46);
+
+    parts.push(header, f.data);
+    centralDir.push(cdEntry);
+    offset += header.length + f.data.length;
+  }
+
+  const cdOffset = offset;
+  let cdSize = 0;
+  for (const cd of centralDir) cdSize += cd.length;
+
+  // End of central directory
+  const eocd = new Uint8Array(22);
+  const ev = new DataView(eocd.buffer);
+  ev.setUint32(0, 0x06054b50, true);
+  ev.setUint16(4, 0, true);
+  ev.setUint16(6, 0, true);
+  ev.setUint16(8, files.length, true);
+  ev.setUint16(10, files.length, true);
+  ev.setUint32(12, cdSize, true);
+  ev.setUint32(16, cdOffset, true);
+  ev.setUint16(20, 0, true);
+
+  return new Blob([...parts, ...centralDir, eocd], { type: 'application/zip' });
+}
+
+// === VIEW MODE & LIVE SYNC ===
+const isViewMode = new URLSearchParams(window.location.search).has('view');
+const syncChannel = new BroadcastChannel('shapes-sync');
+
+if (isViewMode) {
+  document.getElementById('controls').style.display = 'none';
+  canvas.style.cursor = 'default';
+
+  syncChannel.onmessage = (e) => {
+    const msg = e.data;
+    if (msg.type === 'state') {
+      // Apply global state
+      if (msg.global) {
+        for (const [key, val] of Object.entries(msg.global)) {
+          if (Array.isArray(val) && Array.isArray(G[key])) {
+            G[key][0] = val[0]; G[key][1] = val[1]; G[key][2] = val[2];
+          } else if (key in G) {
+            G[key] = val;
+          }
+        }
+      }
+      // Apply shapes
+      if (msg.shapes) {
+        while (shapes.length < msg.shapes.length) shapes.push(createShape());
+        shapes.length = msg.shapes.length;
+        for (let i = 0; i < msg.shapes.length; i++) {
+          for (const [key, val] of Object.entries(msg.shapes[i])) {
+            if (key === 'shapeTransition') {
+              Object.assign(shapes[i].shapeTransition, val);
+            } else {
+              shapes[i][key] = val;
+            }
+          }
+        }
+      }
+    }
+    if (msg.type === 'posterElements' && msg.elements) {
+      msg.elements.forEach((update, i) => {
+        if (posterElements[i]) Object.assign(posterElements[i], update);
+      });
+      renderPosterTexture();
+    }
+  };
+
+  // === FUN COLOR INTERACTION ===
+  function rgbToHsl(r, g, b) {
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    let h, s, l = (max + min) / 2;
+    if (max === min) { h = s = 0; }
+    else {
+      const d = max - min;
+      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+      if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+      else if (max === g) h = ((b - r) / d + 2) / 6;
+      else h = ((r - g) / d + 4) / 6;
+    }
+    return [h, s, l];
+  }
+  function hslToRgb(h, s, l) {
+    h = ((h % 1) + 1) % 1;
+    if (s === 0) return [l, l, l];
+    const hue2rgb = (p, q, t) => {
+      if (t < 0) t += 1; if (t > 1) t -= 1;
+      if (t < 1/6) return p + (q - p) * 6 * t;
+      if (t < 1/2) return q;
+      if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+      return p;
+    };
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    return [hue2rgb(p, q, h + 1/3), hue2rgb(p, q, h), hue2rgb(p, q, h - 1/3)];
+  }
+
+  const baseColors = {
+    bg: rgbToHsl(...G.bgColor),
+    line: rgbToHsl(...G.lineColor),
+    poster: rgbToHsl(...G.posterColor),
+  };
+  let hueShift = 0, satShift = 0;
+  let viewProfileIdx = -1;
+
+  function applyHueShift() {
+    const apply = (base, key) => {
+      const rgb = hslToRgb(
+        base[0] + hueShift,
+        Math.max(0, Math.min(1, base[1] + satShift)),
+        base[2]
+      );
+      G[key][0] = rgb[0]; G[key][1] = rgb[1]; G[key][2] = rgb[2];
+    };
+    apply(baseColors.bg, 'bgColor');
+    apply(baseColors.line, 'lineColor');
+    apply(baseColors.poster, 'posterColor');
+  }
+
+  let viewDragging = false, viewStartX = 0, viewStartY = 0;
+  let viewStartHue = 0, viewStartSat = 0;
+  let lastTap = 0;
+
+  canvas.addEventListener('pointerdown', e => {
+    const now = performance.now();
+    if (now - lastTap < 300) {
+      hueShift = Math.random();
+      satShift = (Math.random() - 0.5) * 0.4;
+      applyHueShift();
+      lastTap = 0;
+      return;
+    }
+    lastTap = now;
+    viewDragging = true;
+    viewStartX = e.clientX;
+    viewStartY = e.clientY;
+    viewStartHue = hueShift;
+    viewStartSat = satShift;
+    canvas.setPointerCapture(e.pointerId);
+  });
+
+  canvas.addEventListener('pointermove', e => {
+    if (!viewDragging) return;
+    const dx = e.clientX - viewStartX;
+    const dy = e.clientY - viewStartY;
+    hueShift = viewStartHue + dx / window.innerWidth;
+    satShift = Math.max(-0.5, Math.min(0.5, viewStartSat - dy / window.innerHeight * 0.8));
+    applyHueShift();
+    viewProfileIdx = -1;
+  });
+
+  canvas.addEventListener('pointerup', e => {
+    if (!viewDragging) return;
+    viewDragging = false;
+    const dx = Math.abs(e.clientX - viewStartX);
+    const dy = Math.abs(e.clientY - viewStartY);
+    if (dx < 8 && dy < 8) {
+      viewProfileIdx = (viewProfileIdx + 1) % colorProfiles.length;
+      const p = colorProfiles[viewProfileIdx];
+      const hex2rgb = h => [parseInt(h.slice(1,3),16)/255, parseInt(h.slice(3,5),16)/255, parseInt(h.slice(5,7),16)/255];
+      const setBg = hex2rgb(p.bg), setLine = hex2rgb(p.line), setText = hex2rgb(p.text);
+      gsap.to(G.bgColor, { 0: setBg[0], 1: setBg[1], 2: setBg[2], duration: 0.6, ease: 'power2.out' });
+      gsap.to(G.lineColor, { 0: setLine[0], 1: setLine[1], 2: setLine[2], duration: 0.6, ease: 'power2.out' });
+      gsap.to(G.posterColor, { 0: setText[0], 1: setText[1], 2: setText[2], duration: 0.6, ease: 'power2.out' });
+      baseColors.bg = rgbToHsl(...setBg);
+      baseColors.line = rgbToHsl(...setLine);
+      baseColors.poster = rgbToHsl(...setText);
+      hueShift = 0; satShift = 0;
+    }
+  });
+} else {
+  // Master mode: broadcast state changes periodically
+  let lastSyncTime = 0;
+  gsap.ticker.add(() => {
+    const now = performance.now();
+    if (now - lastSyncTime < 100) return;
+    lastSyncTime = now;
+    const globalSnapshot = {};
+    for (const key of Object.keys(G)) {
+      const val = G[key];
+      globalSnapshot[key] = Array.isArray(val) ? val.slice() : val;
+    }
+    const shapesSnapshot = shapes.map(s => {
+      const snap = {};
+      for (const key of Object.keys(s)) {
+        if (key === 'shapeTransition') continue; // ephemeral, not serializable
+        const val = s[key];
+        snap[key] = Array.isArray(val) ? val.slice() : val;
+      }
+      return snap;
+    });
+    try { syncChannel.postMessage({ type: 'state', global: globalSnapshot, shapes: shapesSnapshot }); } catch(e) {}
+  });
+
+  document.getElementById('posterSaveLayout').addEventListener('click', () => {
+    syncChannel.postMessage({
+      type: 'posterElements',
+      elements: posterElements.map(el => ({ x: el.x, y: el.y, size: el.size }))
+    });
+  });
+}
+
+console.log('Shapes initialized.', isViewMode ? '(view mode)' : '(master mode)');
+
+// === AUDIO PLAYER ===
+{
+  const audio = document.getElementById('audio-player');
+  const FADE_DUR = 2; // seconds
+  const TRACK_END = audio.duration || 340; // fallback if not loaded yet
+  audio.volume = 0;
+
+  let initialSeekDone = false;
+  function trySeek() {
+    if (initialSeekDone) return;
+    if (audio.seekable.length > 0 && audio.seekable.end(0) >= 121) {
+      audio.currentTime = 121;
+      initialSeekDone = true;
+      // Fade in
+      gsap.to(audio, { volume: 1, duration: FADE_DUR, ease: 'power2.in' });
+    }
+  }
+  audio.addEventListener('progress', trySeek);
+  audio.addEventListener('canplay', trySeek);
+  audio.addEventListener('playing', trySeek);
+  audio.addEventListener('timeupdate', () => {
+    if (!initialSeekDone && audio.currentTime < 120) trySeek();
+    // Fade out near end of track
+    const dur = audio.duration || TRACK_END;
+    const remaining = dur - audio.currentTime;
+    if (remaining <= FADE_DUR && remaining > 0 && !audio.muted) {
+      audio.volume = Math.max(0, remaining / FADE_DUR);
+    }
+  });
+  // Reset volume on loop restart
+  audio.addEventListener('seeked', () => {
+    if (initialSeekDone && audio.currentTime < 1) {
+      audio.volume = 0;
+      gsap.to(audio, { volume: 1, duration: FADE_DUR, ease: 'power2.in' });
+    }
+  });
+
+  // Click on mute icon region (detected via canvas coordinates)
+  canvas.addEventListener('click', (e) => {
+    if (!muteIconBBox) return;
+    const bb = muteIconBBox;
+    if (e.clientX >= bb.x && e.clientX <= bb.x + bb.w &&
+        e.clientY >= bb.y && e.clientY <= bb.y + bb.h) {
+      audioMuted = !audioMuted;
+      audio.muted = audioMuted;
+      renderPosterTexture(true);
+    }
+  });
+
+  // Autoplay on first interaction
+  function playOnInteraction() {
+    document.removeEventListener('click', playOnInteraction);
+    document.removeEventListener('touchstart', playOnInteraction);
+    audio.play().catch(() => {});
+  }
+  document.addEventListener('click', playOnInteraction);
+  document.addEventListener('touchstart', playOnInteraction, { passive: true });
+  audio.play().catch(() => {});
+}
+</script>
+</body>
+</html>
