@@ -2332,22 +2332,29 @@ window.addEventListener('touchend', () => posterDragEnd());
 window.addEventListener('mouseup', () => posterDragEnd());
 
 // Explicitly load fonts, then render poster
-Promise.allSettled([
+// Font promises
+const fontPromises = [
   new FontFace('VG5000', "url('assets/Fonts/VG5000-Regular_web.woff2') format('woff2'), url('assets/Fonts/VG5000-Regular_web.woff') format('woff')").load().then(f => document.fonts.add(f)),
   new FontFace('Aeonik', "url('assets/Fonts/AeonikTRIAL-Medium.otf') format('opentype')").load().then(f => document.fonts.add(f)),
   new FontFace('AeonikBlack', "url('assets/Fonts/AeonikTRIAL-Black.otf') format('opentype')").load().then(f => document.fonts.add(f)),
-]).then(() => {
-  loadPreset('DR5');
-  renderPosterTexture();
-  // Animate poster text reveal
-  playReveal();
-  let posterResizeTimer;
-  window.addEventListener('resize', () => {
-    renderPosterTexture(true);
-    clearTimeout(posterResizeTimer);
-    posterResizeTimer = setTimeout(() => renderPosterTexture(false), 200);
+];
+// Video promises (resolve on canplay or after timeout)
+function videoLoadPromise(vid, timeout) {
+  return new Promise(function(resolve) {
+    if (vid.readyState >= 3) return resolve();
+    vid.addEventListener('canplay', resolve, { once: true });
+    setTimeout(resolve, timeout);
   });
-});
+}
+// Logo promises
+function imgLoadPromise(img, timeout) {
+  return new Promise(function(resolve) {
+    if (img.complete && img.naturalWidth) return resolve();
+    img.addEventListener('load', resolve, { once: true });
+    img.addEventListener('error', resolve, { once: true });
+    setTimeout(resolve, timeout);
+  });
+}
 
 // === VIDEO OVERLAY TEXTURE ===
 let videoTex = null;
@@ -3121,9 +3128,28 @@ function render(time, dt) {
   drawQuad();
 }
 
-// Use GSAP ticker instead of requestAnimationFrame
-gsap.ticker.add(render);
-gsap.ticker.fps(60);
+// Wait for all assets, then start render loop + reveal
+Promise.allSettled([
+  ...fontPromises,
+  videoLoadPromise(overlayVideo, 8000),
+  videoLoadPromise(overlayVideo2, 8000),
+  imgLoadPromise(raLogo, 5000),
+  imgLoadPromise(reLogo, 5000),
+  imgLoadPromise(radio28Logo, 5000),
+  imgLoadPromise(vinylEventLogo, 5000),
+]).then(function() {
+  loadPreset('DR5');
+  renderPosterTexture();
+  gsap.ticker.add(render);
+  gsap.ticker.fps(60);
+  playReveal();
+  var posterResizeTimer;
+  window.addEventListener('resize', function() {
+    renderPosterTexture(true);
+    clearTimeout(posterResizeTimer);
+    posterResizeTimer = setTimeout(function() { renderPosterTexture(false); }, 200);
+  });
+});
 
 // === BREATHING ANIMATION ===
 let breathingTL = null;
